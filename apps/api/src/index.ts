@@ -57,6 +57,16 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Root route
+app.get('/', (_req, res) => {
+  res.json({
+    name: 'Blooming Beauty Skin API',
+    version: '1.0.0',
+    health: '/health',
+    docs: '/api/products',
+  });
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
