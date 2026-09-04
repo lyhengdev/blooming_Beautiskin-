@@ -76,5 +76,10 @@ WORKDIR /app
 COPY --from=builder /app/apps/web/public/logo.png /app/assets/logo.png
 ENV LOGO_PATH=/app/assets/logo.png
 
+# Entrypoint auto-runs migrations (+ optional seed) before starting the server,
+# so no manual commands are needed on Render.
+COPY apps/api/docker-entrypoint.sh /app/apps/api/docker-entrypoint.sh
+RUN chmod +x /app/apps/api/docker-entrypoint.sh
+
 # Invoke the compiled entrypoint
-CMD ["node", "apps/api/dist/index.js"]
+ENTRYPOINT ["sh", "/app/apps/api/docker-entrypoint.sh"]
