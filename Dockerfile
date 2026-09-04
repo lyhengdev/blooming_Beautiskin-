@@ -66,6 +66,12 @@ COPY --from=builder /app/pnpm-workspace.yaml /app/package.json /app/pnpm-lock.ya
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api ./apps/api
 
+# Regenerate the Prisma client for the actual runtime platform so the
+# query engine binary matches this Linux image (dev builds are macOS).
+WORKDIR /app/apps/api
+RUN npx prisma generate
+WORKDIR /app
+
 # Brand logo used on the invoice receipt (optional; skipped if absent)
 COPY --from=builder /app/apps/web/public/logo.png /app/assets/logo.png
 ENV LOGO_PATH=/app/assets/logo.png
