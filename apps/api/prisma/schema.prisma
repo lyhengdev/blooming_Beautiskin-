@@ -344,6 +344,15 @@ enum SkinType {
 // HOMEPAGE CMS
 // ==========================================
 
+model HomeSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+
+  @@map("home_settings")
+}
+
 model Banner {
   id          String      @id @default(cuid())
   title       String

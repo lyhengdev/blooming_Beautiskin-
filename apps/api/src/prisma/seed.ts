@@ -21,6 +21,7 @@ async function main() {
   await prisma.brand.deleteMany();
   await prisma.blogPost.deleteMany();
   await prisma.banner.deleteMany();
+  await prisma.homeSetting.deleteMany();
   await prisma.coupon.deleteMany();
   await prisma.skinProfile.deleteMany();
   await prisma.address.deleteMany();
@@ -457,6 +458,75 @@ async function main() {
         badgeText: 'Free Quiz',
         sortOrder: 2,
         isActive: true,
+      },
+    ],
+  });
+
+  // Homepage CMS settings
+  await prisma.homeSetting.createMany({
+    data: [
+      {
+        key: 'promoBanner',
+        value: {
+          badgeText: 'Limited Offer',
+          title: 'Get 10% Off Your First Order',
+          subtitle:
+            'Use code BLOOM10 at checkout. Valid on all products. No minimum order required.',
+          code: 'BLOOM10',
+          ctaLabel: 'Shop Now',
+          ctaLink: '/shop',
+        },
+      },
+      {
+        key: 'trustBadges',
+        value: {
+          items: [
+            {
+              icon: 'ShieldCheck',
+              bg: 'bg-sky-100',
+              ic: 'text-sky-300',
+              title: 'Authentic Products',
+              text: 'Sourced from trusted brands and distributors. Every product is 100% genuine.',
+            },
+            {
+              icon: 'Heart',
+              bg: 'bg-blush-100',
+              ic: 'text-primary-400',
+              title: 'Seller-Curated',
+              text: 'Handpicked with care for routines real people can use and love every day.',
+            },
+            {
+              icon: 'Truck',
+              bg: 'bg-peach-100',
+              ic: 'text-peach-300',
+              title: 'Cambodia Delivery',
+              text: 'Free shipping on orders over $30. Same-day delivery available in Phnom Penh.',
+            },
+          ],
+        },
+      },
+      {
+        key: 'social',
+        value: {
+          links: [
+            {
+              label: 'Facebook',
+              href: 'https://www.facebook.com/p/Blooming-Beauty-Skin-100067171744804/',
+            },
+            {
+              label: 'Instagram',
+              href: 'https://www.instagram.com/skinbloomingbeauty/',
+            },
+            {
+              label: 'TikTok',
+              href: 'https://www.tiktok.com/@skinbloomingbeauty2',
+            },
+            {
+              label: 'Telegram',
+              href: 'https://t.me/+vFrCO2pmNHthN2Fl',
+            },
+          ],
+        },
       },
     ],
   });

@@ -6,8 +6,9 @@ import { useEffect, useState } from 'react';
 import {
   ArrowRight, Droplet, Droplets, Flower2,
   Gift, Heart, Package, ShieldCheck,
-  Sun, Truck, Flame, Tag,
+  Sun, Truck, Flame,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import HeroBannerSlider from '@/components/home/HeroBannerSlider';
@@ -36,15 +37,44 @@ interface Brand {
   _count: { products: number };
 }
 
-// ── Static data ───────────────────────────────────────────────────────────────
+interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  image: string | null;
+}
 
-const CATEGORIES = [
-  { name: 'Cleanser',    href: '/shop?category=cleanser',    icon: Droplets, bg: 'bg-sky-100',     ic: 'text-sky-300'      },
-  { name: 'Toner',       href: '/shop?category=toner',       icon: Droplet,  bg: 'bg-blush-100',   ic: 'text-primary-400'  },
-  { name: 'Serum',       href: '/shop?category=serum',       icon: Flower2,  bg: 'bg-peach-100',   ic: 'text-peach-300'    },
-  { name: 'Moisturizer', href: '/shop?category=moisturizer', icon: Droplets, bg: 'bg-primary-100', ic: 'text-primary-500'  },
-  { name: 'Sunscreen',   href: '/shop?category=sunscreen',   icon: Sun,      bg: 'bg-cream-100',   ic: 'text-amber-400'    },
-  { name: 'Mask',        href: '/shop?category=mask',        icon: Gift,     bg: 'bg-blush-200',   ic: 'text-primary-600'  },
+interface PromoBanner {
+  badgeText: string;
+  title: string;
+  subtitle: string;
+  code: string;
+  ctaLabel: string;
+  ctaLink: string;
+}
+
+interface TrustBadge {
+  icon: string;
+  bg: string;
+  ic: string;
+  title: string;
+  text: string;
+}
+
+interface SocialLink {
+  label: string;
+  href: string;
+}
+
+// ── Fallback data (shown only if the API is unreachable) ─────────────────────
+
+const CATEGORIES: Category[] = [
+  { id: 'c1', name: 'Cleanser',    slug: 'cleanser',    image: null },
+  { id: 'c2', name: 'Toner',       slug: 'toner',       image: null },
+  { id: 'c3', name: 'Serum',       slug: 'serum',       image: null },
+  { id: 'c4', name: 'Moisturizer', slug: 'moisturizer', image: null },
+  { id: 'c5', name: 'Sunscreen',   slug: 'sunscreen',   image: null },
+  { id: 'c6', name: 'Mask',        slug: 'mask',        image: null },
 ];
 
 const FALLBACK: Product[] = [
@@ -54,12 +84,59 @@ const FALLBACK: Product[] = [
   { id: 'f4', name: 'Daily Soft Sunscreen',                 slug: 'daily-soft-sunscreen',              shortDesc: 'Lightweight protection for everyday Cambodian weather.', price: '18.99', comparePrice: null, brand: { name: 'Blooming Picks',   slug: 'blooming-picks'    }, images: [] },
 ];
 
-const SOCIAL = [
+const FALLBACK_PROMO: PromoBanner = {
+  badgeText: 'Limited Offer',
+  title: 'Get 10% Off Your First Order',
+  subtitle: 'Use code BLOOM10 at checkout. Valid on all products. No minimum order required.',
+  code: 'BLOOM10',
+  ctaLabel: 'Shop Now',
+  ctaLink: '/shop',
+};
+
+const FALLBACK_BADGES: TrustBadge[] = [
+  { icon: 'ShieldCheck', bg: 'bg-sky-100',   ic: 'text-sky-300',     title: 'Authentic Products',  text: 'Sourced from trusted brands and distributors. Every product is 100% genuine.'        },
+  { icon: 'Heart',       bg: 'bg-blush-100', ic: 'text-primary-400', title: 'Seller-Curated',      text: 'Handpicked with care for routines real people can use and love every day.'            },
+  { icon: 'Truck',       bg: 'bg-peach-100', ic: 'text-peach-300',   title: 'Cambodia Delivery',   text: 'Free shipping on orders over $30. Same-day delivery available in Phnom Penh.'        },
+];
+
+const FALLBACK_SOCIAL: SocialLink[] = [
   { label: 'Facebook',  href: 'https://www.facebook.com/p/Blooming-Beauty-Skin-100067171744804/' },
   { label: 'Instagram', href: 'https://www.instagram.com/skinbloomingbeauty/'                   },
   { label: 'TikTok',    href: 'https://www.tiktok.com/@skinbloomingbeauty2'                     },
   { label: 'Telegram',  href: 'https://t.me/+vFrCO2pmNHthN2Fl'                                 },
 ];
+
+// ── Category icon mapping (by slug) ───────────────────────────────────────────
+
+function categoryIcon(slug: string): LucideIcon {
+  switch (slug) {
+    case 'cleanser':    return Droplets;
+    case 'toner':       return Droplet;
+    case 'serum':       return Flower2;
+    case 'moisturizer': return Droplets;
+    case 'sunscreen':   return Sun;
+    case 'mask':        return Gift;
+    default:            return Package;
+  }
+}
+
+const CATEGORY_COLORS: Record<string, { bg: string; ic: string }> = {
+  cleanser:    { bg: 'bg-sky-100',     ic: 'text-sky-300'    },
+  toner:       { bg: 'bg-blush-100',   ic: 'text-primary-400' },
+  serum:       { bg: 'bg-peach-100',   ic: 'text-peach-300'  },
+  moisturizer: { bg: 'bg-primary-100', ic: 'text-primary-500' },
+  sunscreen:   { bg: 'bg-cream-100',   ic: 'text-amber-400'  },
+  mask:        { bg: 'bg-blush-200',   ic: 'text-primary-600' },
+};
+
+function badgeIcon(name: string): LucideIcon {
+  switch (name) {
+    case 'ShieldCheck': return ShieldCheck;
+    case 'Heart':       return Heart;
+    case 'Truck':       return Truck;
+    default:            return Heart;
+  }
+}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -131,29 +208,43 @@ export default function HomePage() {
   const [newArrivals, setNewArrivals] = useState<Product[]>(FALLBACK);
   const [recommended, setRecommended] = useState<Product[]>(FALLBACK);
   const [brands,      setBrands]      = useState<Brand[]>([]);
+  const [categories,  setCategories]  = useState<Category[]>(CATEGORIES);
+  const [promo,       setPromo]       = useState<PromoBanner>(FALLBACK_PROMO);
+  const [badges,      setBadges]      = useState<TrustBadge[]>(FALLBACK_BADGES);
+  const [social,      setSocial]      = useState<SocialLink[]>(FALLBACK_SOCIAL);
 
   useEffect(() => {
     async function load() {
       try {
-        const [featRes, bestRes, newRes, recRes, brandRes] = await Promise.all([
+        const [featRes, bestRes, newRes, recRes, brandRes, catRes, homeRes] = await Promise.all([
           api.get('/products/featured'),
           api.get('/products/bestsellers'),
           api.get('/products/new'),
           api.get('/products/recommended'),
           api.get('/brands'),
+          api.get('/categories'),
+          api.get('/home/settings'),
         ]);
         const feat = featRes.data.data.products ?? [];
         const best = bestRes.data.data.products ?? [];
         const newP = newRes.data.data.products  ?? [];
         const rec  = recRes.data.data.products  ?? [];
         const br   = brandRes.data.data.brands  ?? [];
+        const cats = catRes.data.data.categories ?? [];
+        const s    = homeRes.data.data.settings  ?? {};
+
         if (feat.length > 0) setFeatured(feat);
         if (best.length > 0) setBestsellers(best);
         if (newP.length > 0) setNewArrivals(newP);
         if (rec.length > 0)  setRecommended(rec);
         if (br.length > 0)   setBrands(br);
+        if (cats.length > 0) setCategories(cats);
+
+        if (s.promoBanner)   setPromo(s.promoBanner);
+        if (s.trustBadges?.items?.length > 0)  setBadges(s.trustBadges.items);
+        if (s.social?.links?.length > 0)       setSocial(s.social.links);
       } catch {
-        // keep fallback
+        // keep fallbacks
       }
     }
     load();
@@ -254,22 +345,34 @@ export default function HomePage() {
             </div>
             <div className="relative">
               <div className="flex gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-6 md:overflow-visible md:pb-0 scrollbar-hide pr-6 md:pr-0">
-                {CATEGORIES.map((cat) => (
-                  <Link
-                    key={cat.name}
-                    href={cat.href}
-                    className="group flex flex-col items-center gap-2.5 rounded-3xl border border-blush-100
-                               bg-white p-4 text-center shadow-pink-sm shrink-0 w-28 md:w-auto
-                               transition-all duration-200 hover:-translate-y-1 hover:border-primary-200 hover:shadow-pink-md"
-                  >
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${cat.bg}`}>
-                      <cat.icon className={`h-6 w-6 ${cat.ic}`} />
-                    </div>
-                    <p className="text-sm font-bold text-gray-700 group-hover:text-primary-600 transition-colors">
-                      {cat.name}
-                    </p>
-                  </Link>
-                ))}
+                {categories.map((cat) => {
+                  const Icon = categoryIcon(cat.slug);
+                  const colors = CATEGORY_COLORS[cat.slug] ?? { bg: 'bg-blush-100', ic: 'text-primary-400' };
+                  return (
+                    <Link
+                      key={cat.id}
+                      href={`/shop?category=${cat.slug}`}
+                      className="group flex flex-col items-center gap-2.5 rounded-3xl border border-blush-100
+                                 bg-white p-4 text-center shadow-pink-sm shrink-0 w-28 md:w-auto
+                                 transition-all duration-200 hover:-translate-y-1 hover:border-primary-200 hover:shadow-pink-md"
+                    >
+                      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${colors.bg}`}>
+                        {cat.image ? (
+                          <img
+                            src={cat.image}
+                            alt={cat.name}
+                            className="h-full w-full rounded-2xl object-cover"
+                          />
+                        ) : (
+                          <Icon className={`h-6 w-6 ${colors.ic}`} />
+                        )}
+                      </div>
+                      <p className="text-sm font-bold text-gray-700 group-hover:text-primary-600 transition-colors">
+                        {cat.name}
+                      </p>
+                    </Link>
+                  );
+                })}
               </div>
               <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-blush-50 to-transparent md:hidden" />
             </div>
@@ -334,22 +437,22 @@ export default function HomePage() {
               <div className="relative flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white mb-3">
-                    <Flame className="h-3 w-3" /> Limited Offer
+                    <Flame className="h-3 w-3" /> {promo.badgeText}
                   </span>
                   <h2 className="text-2xl font-heading font-extrabold text-white sm:text-3xl lg:text-4xl">
-                    Get 10% Off Your First Order
+                    {promo.title}
                   </h2>
                   <p className="mt-2 text-primary-100 text-sm leading-relaxed max-w-md">
-                    Use code <strong className="text-white font-extrabold">BLOOM10</strong> at checkout.
-                    Valid on all products. No minimum order required.
+                    {promo.subtitle}{' '}
+                    <strong className="text-white font-extrabold">{promo.code}</strong>
                   </p>
                 </div>
                 <Link
-                  href="/shop"
+                  href={promo.ctaLink}
                   className="shrink-0 rounded-full bg-white px-7 py-3.5 text-sm font-extrabold text-primary-600
                              shadow-pink-md hover:bg-primary-50 transition-all hover:-translate-y-0.5"
                 >
-                  Shop Now →
+                  {promo.ctaLabel} →
                 </Link>
               </div>
             </div>
@@ -401,21 +504,20 @@ export default function HomePage() {
         <section className="py-10 lg:py-14 bg-white">
           <div className="container-shop">
             <div className="grid gap-4 md:grid-cols-3">
-              {[
-                { icon: ShieldCheck, bg: 'bg-sky-100',   ic: 'text-sky-300',     title: 'Authentic Products',  text: 'Sourced from trusted brands and distributors. Every product is 100% genuine.'        },
-                { icon: Heart,       bg: 'bg-blush-100', ic: 'text-primary-400', title: 'Seller-Curated',      text: 'Handpicked with care for routines real people can use and love every day.'            },
-                { icon: Truck,       bg: 'bg-peach-100', ic: 'text-peach-300',   title: 'Cambodia Delivery',   text: 'Free shipping on orders over $30. Same-day delivery available in Phnom Penh.'        },
-              ].map((item) => (
-                <div key={item.title} className="rounded-3xl bg-white border border-blush-100 p-6 shadow-pink-sm hover:shadow-pink-md transition-shadow">
-                  <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${item.bg}`}>
-                    <item.icon className={`h-6 w-6 ${item.ic}`} />
+              {badges.map((item) => {
+                const Icon = badgeIcon(item.icon);
+                return (
+                  <div key={item.title} className="rounded-3xl bg-white border border-blush-100 p-6 shadow-pink-sm hover:shadow-pink-md transition-shadow">
+                    <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${item.bg}`}>
+                      <Icon className={`h-6 w-6 ${item.ic}`} />
+                    </div>
+                    <h3 className="mt-4 font-heading text-lg font-extrabold text-gray-800">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-sm text-gray-500 leading-relaxed">{item.text}</p>
                   </div>
-                  <h3 className="mt-4 font-heading text-lg font-extrabold text-gray-800">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 text-sm text-gray-500 leading-relaxed">{item.text}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </section>
@@ -451,7 +553,7 @@ export default function HomePage() {
                 Follow us
               </p>
               <div className="flex flex-wrap justify-center gap-3">
-                {SOCIAL.map((s) => (
+                {social.map((s) => (
                   <a
                     key={s.label}
                     href={s.href}
