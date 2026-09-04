@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+.git
+.gitignore
+.idea
+.pnpm-store
+*.log
+docker
+docker-compose.yml
+Screenshot*.png
