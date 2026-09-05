@@ -16,6 +16,16 @@ router.get('/stats', asyncHandler(adminController.getDashboardStats));
 // ── Customers ────────────────────────────────────────────────────────────────
 router.get('/customers', asyncHandler(adminController.getAllCustomers));
 router.get('/customers/:id', asyncHandler(adminController.getCustomerById));
+router.post(
+  '/customers',
+  [
+    body('name').isString().notEmpty(),
+    body('phone').optional().isString(),
+    body('email').optional().isEmail(),
+  ],
+  validate,
+  asyncHandler(adminController.createCustomer),
+);
 
 // ── Orders (legacy, kept for backward compat) ────────────────────────────────
 router.get('/orders', asyncHandler(adminController.getAllOrders));

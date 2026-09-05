@@ -5,7 +5,7 @@ import Image from 'next/image';
 import {
   Loader2, Search, Plus, Minus, Trash2, X, Package,
   ShoppingCart, User, Phone, MapPin, DollarSign,
-  MessageSquare, CheckCircle2, ChevronDown, Users,
+  MessageSquare, CheckCircle2, ChevronDown, Users, UserPlus,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -111,6 +111,43 @@ export default function OnlineSellingPage() {
     setCustomerSearch('');
   }
 
+  function clearCustomer() {
+    setSelectedUserId('');
+    setShowCustomerDropdown(false);
+    setCustomerSearch('');
+    setRegisterOpen(false);
+  }
+
+  // Inline "register new customer" used when a scanned/typed phone has no match
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const [registerName, setRegisterName] = useState('');
+  const [registerPhone, setRegisterPhone] = useState('');
+  const registerMutation = useMutation({
+    mutationFn: (payload: { name: string; phone?: string }) =>
+      api.post('/admin/customers', payload),
+    onSuccess: (res) => {
+      const data = res?.data?.data as { customer?: Customer; alreadyExists?: boolean } | undefined;
+      const created = data?.customer;
+      if (created) {
+        selectCustomer(created);
+        toast.success(data?.alreadyExists ? 'Customer already exists — selected' : 'Customer registered');
+      }
+      setRegisterOpen(false);
+      setRegisterName('');
+      setRegisterPhone('');
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to register customer');
+    },
+  });
+
+  function openRegister(phoneHint?: string) {
+    const hint = phoneHint || phone || customerSearch || '';
+    setRegisterPhone(hint);
+    setRegisterName(name || '');
+    setRegisterOpen(true);
+  }
+
   function addToCart(product: Product) {
     setCart((prev) => {
       const existing = prev.find((l) => l.product.id === product.id);
@@ -168,6 +205,9 @@ export default function OnlineSellingPage() {
       setName(''); setPhone(''); setAddress(''); setCity('');
       setProvince(''); setNotes(''); setDeliveryFee('1.50');
       setSelectedUserId('');
+      setRegisterOpen(false);
+      setRegisterName('');
+      setRegisterPhone('');
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to create order');
@@ -345,12 +385,32 @@ export default function OnlineSellingPage() {
               <button
                 type="button"
                 onClick={() => setShowCustomerDropdown((s) => !s)}
-                className="w-full flex items-center gap-2 rounded-xl border border-dashed border-blush-200 bg-blush-50/50 px-3 py-2 text-xs text-gray-500 hover:bg-blush-100 transition-colors"
+                className={`w-full flex items-center gap-2 rounded-xl border px-3 py-2 text-xs transition-colors ${
+                  selectedUserId
+                    ? 'border-emerald-200 bg-emerald-50/50 text-gray-700 hover:bg-emerald-50'
+                    : 'border-dashed border-blush-200 bg-blush-50/50 text-gray-500 hover:bg-blush-100'
+                }`}
               >
-                <Users className="h-4 w-4 text-blush-400" />
+                {selectedUserId ? (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                ) : (
+                  <Users className="h-4 w-4 text-blush-400" />
+                )}
                 <span className="flex-1 text-left truncate">
-                  {selectedUserId ? customers.find((c) => c.id === selectedUserId)?.name || 'Selected customer' : 'Pick existing customer (optional)'}
+                  {selectedUserId
+                    ? customers.find((c) => c.id === selectedUserId)?.name || 'Selected customer'
+                    : 'Walk-in · no account linked'}
                 </span>
+                {selectedUserId && (
+                  <span
+                    role="button"
+                    onClick={(e) => { e.stopPropagation(); clearCustomer(); }}
+                    className="shrink-0 p-1 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500"
+                    title="Clear selection"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </span>
+                )}
                 <ChevronDown className="h-3.5 w-3.5 text-gray-400" />
               </button>
 
@@ -361,12 +421,26 @@ export default function OnlineSellingPage() {
                     <input
                       value={customerSearch}
                       onChange={(e) => setCustomerSearch(e.target.value)}
-                      placeholder="Search customers..."
+                      placeholder="Search phone, name, email...  (scan a number)"
                       className="input-field w-full pl-8 text-xs"
                       autoFocus
                     />
                   </div>
                   <div className="max-h-48 overflow-y-auto">
+                    {/* Walk-in row */}
+                    <button
+                      onClick={clearCustomer}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-blush-50 text-left"
+                    >
+                      <div className="h-6 w-6 rounded-full bg-blush-100 flex items-center justify-center shrink-0">
+                        <Users className="h-3 w-3 text-blush-500" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-gray-700 truncate">Walk-in · no account</p>
+                        <p className="text-gray-400 text-[10px] truncate">Just fill the customer info below</p>
+                      </div>
+                    </button>
+
                     {customers.map((c) => (
                       <button
                         key={c.id}
@@ -382,9 +456,49 @@ export default function OnlineSellingPage() {
                         </div>
                       </button>
                     ))}
-                    {customers.length === 0 && (
-                      <p className="px-3 py-4 text-center text-xs text-gray-400">No customers found</p>
-                    )}
+
+                    {customers.length === 0 && customerSearch ? (
+                      <>
+                        <p className="px-3 pt-3 text-center text-xs text-gray-400">
+                          No customer with “{customerSearch}” found
+                        </p>
+                        {!registerOpen ? (
+                          <button
+                            onClick={() => openRegister(customerSearch)}
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-xs font-bold text-primary-500 hover:bg-primary-50 border-t border-blush-50 mt-2"
+                          >
+                            <UserPlus className="h-3.5 w-3.5" /> Register “{customerSearch}” as new customer
+                          </button>
+                        ) : (
+                          <div className="p-3 space-y-2 border-t border-blush-50">
+                            <input
+                              value={registerName}
+                              onChange={(e) => setRegisterName(e.target.value)}
+                              placeholder="Full name *"
+                              className="input-field w-full text-xs"
+                            />
+                            <input
+                              value={registerPhone}
+                              onChange={(e) => setRegisterPhone(e.target.value)}
+                              placeholder="Phone"
+                              className="input-field w-full text-xs"
+                            />
+                            <button
+                              onClick={() => registerMutation.mutate({ name: registerName, phone: registerPhone || undefined })}
+                              disabled={!registerName.trim() || registerMutation.isPending}
+                              className="btn-primary w-full py-2 text-xs flex items-center justify-center gap-1.5 disabled:opacity-40"
+                            >
+                              {registerMutation.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
+                              Register customer
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    ) : customers.length === 0 ? (
+                      <p className="px-3 py-4 text-center text-xs text-gray-400">
+                        No customers yet — search a phone number to register one
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               )}

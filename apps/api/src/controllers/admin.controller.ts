@@ -3,6 +3,9 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { sendInvoice } from '../lib/telegram';
 import { Prisma } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
+import { phoneMatches, isPhoneLikeQuery } from '../lib/phone';
 
 const VALID_STATUSES = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPING', 'DELIVERED', 'CANCELLED', 'REFUNDED'] as const;
 
@@ -236,11 +239,27 @@ export async function getAllCustomers(req: Request, res: Response) {
 
   if (search) {
     const q = search as string;
-    where.OR = [
-      { name: { contains: q, mode: 'insensitive' } },
-      { email: { contains: q, mode: 'insensitive' } },
-      { phone: { contains: q } },
-    ];
+    if (isPhoneLikeQuery(q)) {
+      // Smart phone matching: +855/855/0/spaces variants all normalize equal.
+      const phones = await prisma.user.findMany({
+        where: { role: 'CUSTOMER' },
+        select: { id: true, phone: true },
+      });
+      const matchedIds = phones
+        .filter((p) => p.phone && phoneMatches(p.phone, q))
+        .map((p) => p.id);
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+      ];
+      if (matchedIds.length) where.OR.push({ id: { in: matchedIds } });
+    } else {
+      where.OR = [
+        { name: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { phone: { contains: q } },
+      ];
+    }
   }
 
   const [customers, total] = await Promise.all([
@@ -349,4 +368,65 @@ export async function getCustomerById(req: Request, res: Response) {
       },
     },
   });
+}
+
+/**
+ * POST /api/admin/customers
+ * Admin creates a customer on the fly (used by the Online Selling page when
+ * a scanned/typed phone number doesn't match an existing customer).
+ */
+export async function createCustomer(req: Request, res: Response) {
+  const { name, phone, email } = req.body ?? {};
+
+  if (!name || !String(name).trim()) {
+    throw new AppError('Customer name is required', 400);
+  }
+
+  const cleanName = String(name).trim();
+  const cleanPhone = phone ? String(phone).trim() : null;
+  const cleanEmail = email ? String(email).trim().toLowerCase() : null;
+
+  // If the phone already exists (in any format), return the existing customer.
+  if (cleanPhone) {
+    const existing = await prisma.user.findMany({
+      where: { role: 'CUSTOMER' },
+      select: { id: true, name: true, email: true, phone: true, createdAt: true },
+    });
+    const dup = existing.find((c) => c.phone && phoneMatches(c.phone, cleanPhone));
+    if (dup) {
+      res.status(200).json({ status: 'success', data: { customer: dup, alreadyExists: true } });
+      return;
+    }
+  }
+
+  // Generate a unique email if none provided (email column is unique).
+  let finalEmail = cleanEmail;
+  if (!finalEmail) {
+    const base = cleanPhone?.replace(/\D/g, '') || 'walkin';
+    const suffix = randomBytes(4).toString('hex');
+    finalEmail = `${base}${suffix}@walkin.customer`;
+  }
+
+  // The account password is unused for admin-created walk-ins; generate a
+  // random one so the row satisfies the required field.
+  const hashedPassword = await bcrypt.hash(randomBytes(16).toString('hex'), 12);
+
+  const customer = await prisma.user.create({
+    data: {
+      name: cleanName,
+      email: finalEmail,
+      phone: cleanPhone,
+      password: hashedPassword,
+      role: 'CUSTOMER',
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      createdAt: true,
+    },
+  });
+
+  res.status(201).json({ status: 'success', data: { customer } });
 }
