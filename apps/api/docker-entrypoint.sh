@@ -46,7 +46,7 @@ echo "[entrypoint] Running production setup (upsert admin & home settings)..."
 # ── 4. Start the API server (background, internal :4000) ───────────────────
 echo "[entrypoint] Starting API server on :4000..."
 cd /app
-node apps/api/dist/index.js &
+PORT=4000 node apps/api/dist/index.js &
 API_PID=$!
 
 # ── 5. Wait for the API to accept requests ─────────────────────────────────
