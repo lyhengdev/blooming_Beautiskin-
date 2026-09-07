@@ -4,15 +4,32 @@ set -e
 echo "[entrypoint] Blooming Beauty Skin API — starting up"
 echo "[entrypoint] NODE_ENV=${NODE_ENV:-production}"
 
-# ── 1. Apply pending database migrations (safe & idempotent) ──────────────
+# ── 1. Apply schema (migrations if available, else db push) ────────────────
 # Render can't run manual commands, so we do it here on every boot.
-# prisma migrate deploy only applies migrations that haven't been applied yet.
+# - If the DB already has a migration history, apply pending migrations.
+# - If the DB has tables but no migration table (created via `db push`), the
+#   P3005 baseline error would abort migrate deploy — so use db push instead,
+#   which reconciles the schema idempotently.
 if [ "${SKIP_MIGRATIONS}" != "true" ]; then
-  echo "[entrypoint] Applying database migrations..."
-  ( cd /app/apps/api && ./node_modules/.bin/prisma migrate deploy ) \
-    || { echo "[entrypoint] ERROR: migrations failed"; exit 1; }
+  MIGRATIONS_TABLE="$(cd /app/apps/api && node -e "
+    const { PrismaClient } = require('@prisma/client');
+    const p = new PrismaClient();
+    p.\$queryRawUnsafe(\"SELECT to_regclass('_prisma_migrations') AS t\")
+      .then(r => { console.log(r[0] && r[0].t ? 'yes' : 'no'); return p.\$disconnect(); })
+      .catch(() => { console.log('unknown'); return p.\$disconnect(); });
+  " 2>&1)"
+
+  if [ "${MIGRATIONS_TABLE}" = "yes" ]; then
+    echo "[entrypoint] Migration history found — applying migrations..."
+    ( cd /app/apps/api && ./node_modules/.bin/prisma migrate deploy ) \
+      || { echo "[entrypoint] ERROR: migrations failed"; exit 1; }
+  else
+    echo "[entrypoint] No migration history (existing schema DB) — syncing via prisma db push..."
+    ( cd /app/apps/api && ./node_modules/.bin/prisma db push --skip-generate ) \
+      || { echo "[entrypoint] ERROR: db push failed"; exit 1; }
+  fi
 else
-  echo "[entrypoint] Skipping migrations (SKIP_MIGRATIONS=true)"
+  echo "[entrypoint] Skipping schema sync (SKIP_MIGRATIONS=true)"
 fi
 
 # ── 2. Optional seed on empty DB ──────────────────────────────────────────
