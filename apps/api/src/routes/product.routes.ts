@@ -36,7 +36,7 @@ router.get('/recommended', asyncHandler(productController.getRecommended));
 router.get('/:slug/related', asyncHandler(productController.getRelatedProducts));
 
 // ── Admin — all require ADMIN role ────────────────────────────────────────────
-router.use('/admin', authenticate, authorize('ADMIN'));
+router.use('/admin', authenticate, authorize('ADMIN', 'SUPER_ADMIN'));
 
 router.get('/admin', asyncHandler(productController.getAllProductsAdmin));
 

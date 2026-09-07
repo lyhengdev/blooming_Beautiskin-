@@ -66,46 +66,6 @@ interface SocialLink {
   href: string;
 }
 
-// ── Fallback data (shown only if the API is unreachable) ─────────────────────
-
-const CATEGORIES: Category[] = [
-  { id: 'c1', name: 'Cleanser',    slug: 'cleanser',    image: null },
-  { id: 'c2', name: 'Toner',       slug: 'toner',       image: null },
-  { id: 'c3', name: 'Serum',       slug: 'serum',       image: null },
-  { id: 'c4', name: 'Moisturizer', slug: 'moisturizer', image: null },
-  { id: 'c5', name: 'Sunscreen',   slug: 'sunscreen',   image: null },
-  { id: 'c6', name: 'Mask',        slug: 'mask',        image: null },
-];
-
-const FALLBACK: Product[] = [
-  { id: 'f1', name: 'Snail Mucin 96% Power Essence',        slug: 'cosrx-snail-mucin-96-essence',      shortDesc: 'Hydrating essence for soft, bouncy skin.',              price: '21.99', comparePrice: null, brand: { name: 'COSRX',            slug: 'cosrx'             }, images: [] },
-  { id: 'f2', name: 'Glow Serum : Niacinamide + Propolis',  slug: 'beauty-of-joseon-glow-serum',       shortDesc: 'Gentle glow serum for dullness and uneven tone.',       price: '17.99', comparePrice: null, brand: { name: 'Beauty of Joseon', slug: 'beauty-of-joseon'  }, images: [] },
-  { id: 'f3', name: 'Gokujyun Premium Hyaluronic Lotion',   slug: 'hada-labo-gokujyun-premium-lotion', shortDesc: 'Layer-friendly hydration for dry, dehydrated skin.',    price: '15.99', comparePrice: null, brand: { name: 'Hada Labo',        slug: 'hada-labo'         }, images: [] },
-  { id: 'f4', name: 'Daily Soft Sunscreen',                 slug: 'daily-soft-sunscreen',              shortDesc: 'Lightweight protection for everyday Cambodian weather.', price: '18.99', comparePrice: null, brand: { name: 'Blooming Picks',   slug: 'blooming-picks'    }, images: [] },
-];
-
-const FALLBACK_PROMO: PromoBanner = {
-  badgeText: 'Limited Offer',
-  title: 'Get 10% Off Your First Order',
-  subtitle: 'Use code BLOOM10 at checkout. Valid on all products. No minimum order required.',
-  code: 'BLOOM10',
-  ctaLabel: 'Shop Now',
-  ctaLink: '/shop',
-};
-
-const FALLBACK_BADGES: TrustBadge[] = [
-  { icon: 'ShieldCheck', bg: 'bg-sky-100',   ic: 'text-sky-300',     title: 'Authentic Products',  text: 'Sourced from trusted brands and distributors. Every product is 100% genuine.'        },
-  { icon: 'Heart',       bg: 'bg-blush-100', ic: 'text-primary-400', title: 'Seller-Curated',      text: 'Handpicked with care for routines real people can use and love every day.'            },
-  { icon: 'Truck',       bg: 'bg-peach-100', ic: 'text-peach-300',   title: 'Cambodia Delivery',   text: 'Free shipping on orders over $30. Same-day delivery available in Phnom Penh.'        },
-];
-
-const FALLBACK_SOCIAL: SocialLink[] = [
-  { label: 'Facebook',  href: 'https://www.facebook.com/p/Blooming-Beauty-Skin-100067171744804/' },
-  { label: 'Instagram', href: 'https://www.instagram.com/skinbloomingbeauty/'                   },
-  { label: 'TikTok',    href: 'https://www.tiktok.com/@skinbloomingbeauty2'                     },
-  { label: 'Telegram',  href: 'https://t.me/+vFrCO2pmNHthN2Fl'                                 },
-];
-
 // ── Category icon mapping (by slug) ───────────────────────────────────────────
 
 function categoryIcon(slug: string): LucideIcon {
@@ -203,15 +163,15 @@ function SectionHeader({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
-  const [featured,    setFeatured]    = useState<Product[]>(FALLBACK);
-  const [bestsellers, setBestsellers] = useState<Product[]>(FALLBACK);
-  const [newArrivals, setNewArrivals] = useState<Product[]>(FALLBACK);
-  const [recommended, setRecommended] = useState<Product[]>(FALLBACK);
+  const [featured,    setFeatured]    = useState<Product[]>([]);
+  const [bestsellers, setBestsellers] = useState<Product[]>([]);
+  const [newArrivals, setNewArrivals] = useState<Product[]>([]);
+  const [recommended, setRecommended] = useState<Product[]>([]);
   const [brands,      setBrands]      = useState<Brand[]>([]);
-  const [categories,  setCategories]  = useState<Category[]>(CATEGORIES);
-  const [promo,       setPromo]       = useState<PromoBanner>(FALLBACK_PROMO);
-  const [badges,      setBadges]      = useState<TrustBadge[]>(FALLBACK_BADGES);
-  const [social,      setSocial]      = useState<SocialLink[]>(FALLBACK_SOCIAL);
+  const [categories,  setCategories]  = useState<Category[]>([]);
+  const [promo,       setPromo]       = useState<PromoBanner | null>(null);
+  const [badges,      setBadges]      = useState<TrustBadge[]>([]);
+  const [social,      setSocial]      = useState<SocialLink[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -244,7 +204,7 @@ export default function HomePage() {
         if (s.trustBadges?.items?.length > 0)  setBadges(s.trustBadges.items);
         if (s.social?.links?.length > 0)       setSocial(s.social.links);
       } catch {
-        // keep fallbacks
+        // no fallback data
       }
     }
     load();
@@ -264,120 +224,130 @@ export default function HomePage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 2 — Best-seller Products
         ══════════════════════════════════════════════════════════ */}
-        <section className="py-10 lg:py-14 bg-blush-50">
-          <div className="container-shop">
-            <SectionHeader
-              badge="Customer favourites"
-              title="Best-seller picks"
-              subtitle="Soft, reliable products we would happily recommend across many routines."
-              href="/shop?sort=bestselling"
-            />
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
-              {bestsellers.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+        {bestsellers.length > 0 && (
+          <section className="py-10 lg:py-14 bg-blush-50">
+            <div className="container-shop">
+              <SectionHeader
+                badge="Customer favourites"
+                title="Best-seller picks"
+                subtitle="Soft, reliable products we would happily recommend across many routines."
+                href="/shop?sort=bestselling"
+              />
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+                {bestsellers.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 3 — New Arrivals
         ══════════════════════════════════════════════════════════ */}
-        <section className="py-10 lg:py-14 bg-white">
-          <div className="container-shop">
-            <SectionHeader
-              badge="Just landed"
-              title="New arrivals"
-              subtitle="Fresh additions for cleanser, hydration, glow, and barrier care."
-              href="/shop?sort=newest"
-            />
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
-              {newArrivals.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+        {newArrivals.length > 0 && (
+          <section className="py-10 lg:py-14 bg-white">
+            <div className="container-shop">
+              <SectionHeader
+                badge="Just landed"
+                title="New arrivals"
+                subtitle="Fresh additions for cleanser, hydration, glow, and barrier care."
+                href="/shop?sort=newest"
+              />
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+                {newArrivals.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 4 — Recommended for You
         ══════════════════════════════════════════════════════════ */}
-        <section className="py-10 lg:py-14 bg-blush-50">
-          <div className="container-shop">
-            <SectionHeader
-              badge="Picked for you"
-              title="Recommended products"
-              subtitle="Handpicked routines based on what our customers love most."
-              href="/shop"
-            />
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
-              {recommended.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+        {recommended.length > 0 && (
+          <section className="py-10 lg:py-14 bg-blush-50">
+            <div className="container-shop">
+              <SectionHeader
+                badge="Picked for you"
+                title="Recommended products"
+                subtitle="Handpicked routines based on what our customers love most."
+                href="/shop"
+              />
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+                {recommended.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 5 — Featured / Staff Picks
         ══════════════════════════════════════════════════════════ */}
-        <section className="py-10 lg:py-14 bg-white">
-          <div className="container-shop">
-            <SectionHeader
-              badge="Editor's choice"
-              title="Staff picks"
-              subtitle="Products our team personally uses and loves."
-              href="/shop"
-            />
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
-              {featured.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+        {featured.length > 0 && (
+          <section className="py-10 lg:py-14 bg-white">
+            <div className="container-shop">
+              <SectionHeader
+                badge="Editor's choice"
+                title="Staff picks"
+                subtitle="Products our team personally uses and loves."
+                href="/shop"
+              />
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
+                {featured.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 6 — Category Quick Links
         ══════════════════════════════════════════════════════════ */}
-        <section className="py-10 lg:py-14 bg-blush-50">
-          <div className="container-shop">
-            <div className="mb-6 text-center">
-              <span className="badge-pink">Shop by routine step</span>
-              <h2 className="mt-3 text-2xl font-heading font-extrabold text-gray-800 sm:text-3xl">
-                Choose what your skin needs today
-              </h2>
-              <p className="mx-auto mt-2 max-w-lg text-sm text-gray-500">
-                Start with one step or build a full soft routine — every category curated for gentle daily care.
-              </p>
-            </div>
-            <div className="relative">
-              <div className="flex gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-6 md:overflow-visible md:pb-0 scrollbar-hide pr-6 md:pr-0">
-                {categories.map((cat) => {
-                  const Icon = categoryIcon(cat.slug);
-                  const colors = CATEGORY_COLORS[cat.slug] ?? { bg: 'bg-blush-100', ic: 'text-primary-400' };
-                  return (
-                    <Link
-                      key={cat.id}
-                      href={`/shop?category=${cat.slug}`}
-                      className="group flex flex-col items-center gap-2.5 rounded-3xl border border-blush-100
-                                 bg-white p-4 text-center shadow-pink-sm shrink-0 w-28 md:w-auto
-                                 transition-all duration-200 hover:-translate-y-1 hover:border-primary-200 hover:shadow-pink-md"
-                    >
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${colors.bg}`}>
-                        {cat.image ? (
-                          <img
-                            src={cat.image}
-                            alt={cat.name}
-                            className="h-full w-full rounded-2xl object-cover"
-                          />
-                        ) : (
-                          <Icon className={`h-6 w-6 ${colors.ic}`} />
-                        )}
-                      </div>
-                      <p className="text-sm font-bold text-gray-700 group-hover:text-primary-600 transition-colors">
-                        {cat.name}
-                      </p>
-                    </Link>
-                  );
-                })}
+        {categories.length > 0 && (
+          <section className="py-10 lg:py-14 bg-blush-50">
+            <div className="container-shop">
+              <div className="mb-6 text-center">
+                <span className="badge-pink">Shop by routine step</span>
+                <h2 className="mt-3 text-2xl font-heading font-extrabold text-gray-800 sm:text-3xl">
+                  Choose what your skin needs today
+                </h2>
+                <p className="mx-auto mt-2 max-w-lg text-sm text-gray-500">
+                  Start with one step or build a full soft routine — every category curated for gentle daily care.
+                </p>
               </div>
-              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-blush-50 to-transparent md:hidden" />
+              <div className="relative">
+                <div className="flex gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-6 md:overflow-visible md:pb-0 scrollbar-hide pr-6 md:pr-0">
+                  {categories.map((cat) => {
+                    const Icon = categoryIcon(cat.slug);
+                    const colors = CATEGORY_COLORS[cat.slug] ?? { bg: 'bg-blush-100', ic: 'text-primary-400' };
+                    return (
+                      <Link
+                        key={cat.id}
+                        href={`/shop?category=${cat.slug}`}
+                        className="group flex flex-col items-center gap-2.5 rounded-3xl border border-blush-100
+                                   bg-white p-4 text-center shadow-pink-sm shrink-0 w-28 md:w-auto
+                                   transition-all duration-200 hover:-translate-y-1 hover:border-primary-200 hover:shadow-pink-md"
+                      >
+                        <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${colors.bg}`}>
+                          {cat.image ? (
+                            <img
+                              src={cat.image}
+                              alt={cat.name}
+                              className="h-full w-full rounded-2xl object-cover"
+                            />
+                          ) : (
+                            <Icon className={`h-6 w-6 ${colors.ic}`} />
+                          )}
+                        </div>
+                        <p className="text-sm font-bold text-gray-700 group-hover:text-primary-600 transition-colors">
+                          {cat.name}
+                        </p>
+                      </Link>
+                    );
+                  })}
+                </div>
+                <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-blush-50 to-transparent md:hidden" />
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 7 — Shop by Brand
@@ -427,37 +397,39 @@ export default function HomePage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 8 — Promo Strip
         ══════════════════════════════════════════════════════════ */}
-        <section className="py-10 lg:py-14 bg-white">
-          <div className="container-shop">
-            <div className="relative overflow-hidden rounded-4xl bg-gradient-to-r from-primary-500 via-primary-500 to-primary-600 px-8 py-10 lg:px-14 lg:py-12">
-              {/* Decorative blobs */}
-              <div className="pointer-events-none absolute -top-10 -right-10 h-52 w-52 rounded-full bg-white/10" />
-              <div className="pointer-events-none absolute -bottom-8 left-1/3 h-36 w-36 rounded-full bg-white/10" />
+        {promo && (
+          <section className="py-10 lg:py-14 bg-white">
+            <div className="container-shop">
+              <div className="relative overflow-hidden rounded-4xl bg-gradient-to-r from-primary-500 via-primary-500 to-primary-600 px-8 py-10 lg:px-14 lg:py-12">
+                {/* Decorative blobs */}
+                <div className="pointer-events-none absolute -top-10 -right-10 h-52 w-52 rounded-full bg-white/10" />
+                <div className="pointer-events-none absolute -bottom-8 left-1/3 h-36 w-36 rounded-full bg-white/10" />
 
-              <div className="relative flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white mb-3">
-                    <Flame className="h-3 w-3" /> {promo.badgeText}
-                  </span>
-                  <h2 className="text-2xl font-heading font-extrabold text-white sm:text-3xl lg:text-4xl">
-                    {promo.title}
-                  </h2>
-                  <p className="mt-2 text-primary-100 text-sm leading-relaxed max-w-md">
-                    {promo.subtitle}{' '}
-                    <strong className="text-white font-extrabold">{promo.code}</strong>
-                  </p>
+                <div className="relative flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white mb-3">
+                      <Flame className="h-3 w-3" /> {promo.badgeText}
+                    </span>
+                    <h2 className="text-2xl font-heading font-extrabold text-white sm:text-3xl lg:text-4xl">
+                      {promo.title}
+                    </h2>
+                    <p className="mt-2 text-primary-100 text-sm leading-relaxed max-w-md">
+                      {promo.subtitle}{' '}
+                      <strong className="text-white font-extrabold">{promo.code}</strong>
+                    </p>
+                  </div>
+                  <Link
+                    href={promo.ctaLink}
+                    className="shrink-0 rounded-full bg-white px-7 py-3.5 text-sm font-extrabold text-primary-600
+                               shadow-pink-md hover:bg-primary-50 transition-all hover:-translate-y-0.5"
+                  >
+                    {promo.ctaLabel} →
+                  </Link>
                 </div>
-                <Link
-                  href={promo.ctaLink}
-                  className="shrink-0 rounded-full bg-white px-7 py-3.5 text-sm font-extrabold text-primary-600
-                             shadow-pink-md hover:bg-primary-50 transition-all hover:-translate-y-0.5"
-                >
-                  {promo.ctaLabel} →
-                </Link>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 9 — Skin Quiz CTA (DISABLED — re-enable when ready)
@@ -501,26 +473,28 @@ export default function HomePage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 10 — Trust Badges
         ══════════════════════════════════════════════════════════ */}
-        <section className="py-10 lg:py-14 bg-white">
-          <div className="container-shop">
-            <div className="grid gap-4 md:grid-cols-3">
-              {badges.map((item) => {
-                const Icon = badgeIcon(item.icon);
-                return (
-                  <div key={item.title} className="rounded-3xl bg-white border border-blush-100 p-6 shadow-pink-sm hover:shadow-pink-md transition-shadow">
-                    <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${item.bg}`}>
-                      <Icon className={`h-6 w-6 ${item.ic}`} />
+        {badges.length > 0 && (
+          <section className="py-10 lg:py-14 bg-white">
+            <div className="container-shop">
+              <div className="grid gap-4 md:grid-cols-3">
+                {badges.map((item) => {
+                  const Icon = badgeIcon(item.icon);
+                  return (
+                    <div key={item.title} className="rounded-3xl bg-white border border-blush-100 p-6 shadow-pink-sm hover:shadow-pink-md transition-shadow">
+                      <div className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl ${item.bg}`}>
+                        <Icon className={`h-6 w-6 ${item.ic}`} />
+                      </div>
+                      <h3 className="mt-4 font-heading text-lg font-extrabold text-gray-800">
+                        {item.title}
+                      </h3>
+                      <p className="mt-2 text-sm text-gray-500 leading-relaxed">{item.text}</p>
                     </div>
-                    <h3 className="mt-4 font-heading text-lg font-extrabold text-gray-800">
-                      {item.title}
-                    </h3>
-                    <p className="mt-2 text-sm text-gray-500 leading-relaxed">{item.text}</p>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 11 — Follow Us / Social CTA
@@ -548,24 +522,26 @@ export default function HomePage() {
             </div>
 
             {/* Social links */}
-            <div className="mt-10">
-              <p className="text-xs font-bold uppercase tracking-widest text-primary-400 mb-4">
-                Follow us
-              </p>
-              <div className="flex flex-wrap justify-center gap-3">
-                {social.map((s) => (
-                  <a
-                    key={s.label}
-                    href={s.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="badge-pink text-sm px-4 py-2 hover:bg-primary-500 hover:text-white transition-all duration-150"
-                  >
-                    {s.label}
-                  </a>
-                ))}
+            {social.length > 0 && (
+              <div className="mt-10">
+                <p className="text-xs font-bold uppercase tracking-widest text-primary-400 mb-4">
+                  Follow us
+                </p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  {social.map((s) => (
+                    <a
+                      key={s.label}
+                      href={s.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="badge-pink text-sm px-4 py-2 hover:bg-primary-500 hover:text-white transition-all duration-150"
+                    >
+                      {s.label}
+                    </a>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </section>
 

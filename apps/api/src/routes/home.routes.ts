@@ -9,7 +9,7 @@ const router = Router();
 router.get('/settings', asyncHandler(homeController.getHomeSettings));
 
 // ── Admin — all require ADMIN role ────────────────────────────────────────────
-router.use('/admin', authenticate, authorize('ADMIN'));
+router.use('/admin', authenticate, authorize('ADMIN', 'SUPER_ADMIN'));
 
 router.put('/admin/settings', asyncHandler(homeController.updateHomeSettings));
 

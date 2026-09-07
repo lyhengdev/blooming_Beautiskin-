@@ -21,7 +21,7 @@ router.post(
 );
 
 // ── Admin — all require ADMIN role ────────────────────────────────────────────
-router.use('/admin', authenticate, authorize('ADMIN'));
+router.use('/admin', authenticate, authorize('ADMIN', 'SUPER_ADMIN'));
 
 router.get('/admin', asyncHandler(couponController.getAllCouponsAdmin));
 

@@ -9,7 +9,7 @@ const router = Router();
 
 // ── Admin — all require ADMIN role ────────────────────────────────────────────
 // Admin routes MUST come before /:slug wildcard to avoid the catch-all matching them
-router.use('/admin', authenticate, authorize('ADMIN'));
+router.use('/admin', authenticate, authorize('ADMIN', 'SUPER_ADMIN'));
 
 router.get('/admin', asyncHandler(brandController.getAllBrandsAdmin));
 

@@ -38,6 +38,11 @@ else
   echo "[entrypoint] Skipping seed (set SEED_ON_STARTUP=true to auto-seed an empty DB)"
 fi
 
-# ── 3. Start the API server ───────────────────────────────────────────────
+# ── 3. Setup prod (safe upsert — creates/updates admin + home settings) ──
+echo "[entrypoint] Running production setup (upsert admin & home settings)..."
+( cd /app/apps/api && ./node_modules/.bin/tsx src/prisma/setup-prod.ts ) \
+  || { echo "[entrypoint] WARNING: setup-prod failed (non-fatal, continuing)"; }
+
+# ── 4. Start the API server ───────────────────────────────────────────────
 echo "[entrypoint] Starting API server..."
 exec node apps/api/dist/index.js

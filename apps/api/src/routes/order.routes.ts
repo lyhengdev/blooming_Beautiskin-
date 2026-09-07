@@ -8,7 +8,7 @@ import { authenticate, authorize } from '../middlewares/auth';
 const router = Router();
 
 // ── Admin — all require ADMIN role ────────────────────────────────────────────
-router.use('/admin', authenticate, authorize('ADMIN'));
+router.use('/admin', authenticate, authorize('ADMIN', 'SUPER_ADMIN'));
 
 router.get('/admin/stats', asyncHandler(orderController.getOrderStats));
 router.get('/admin', asyncHandler(orderController.getAllOrdersAdmin));

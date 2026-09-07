@@ -15,20 +15,20 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('Running production setup...');
 
-  // 1. Create admin user (safe upsert — no data loss)
+  // 1. Create super admin user (safe upsert — no data loss)
   const adminPassword = await bcrypt.hash('admin123', 12);
   const admin = await prisma.user.upsert({
     where: { email: 'admin@bloomingbeauty.com' },
-    update: { password: adminPassword, role: Role.ADMIN },
+    update: { password: adminPassword, role: Role.SUPER_ADMIN },
     create: {
       name: 'Admin',
       email: 'admin@bloomingbeauty.com',
       password: adminPassword,
-      role: Role.ADMIN,
+      role: Role.SUPER_ADMIN,
       phone: '+85512345678',
     },
   });
-  console.log(`Admin user ready: ${admin.email}`);
+  console.log(`Super Admin user ready: ${admin.email}`);
 
   // 2. Seed HomeSettings (safe upsert — no data loss)
   await prisma.homeSetting.upsert({
@@ -112,7 +112,7 @@ async function main() {
   console.log('HomeSettings seeded');
 
   console.log('\nDone!');
-  console.log('Admin credentials:');
+  console.log('Super Admin credentials:');
   console.log('  Email:    admin@bloomingbeauty.com');
   console.log('  Password: admin123');
   console.log('  URL:      https://blooming-beautiskin.onrender.com/admin');

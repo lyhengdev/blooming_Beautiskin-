@@ -26,7 +26,7 @@ export async function getPaymentStatus(req: AuthRequest, res: Response) {
   }
 
   // Ownership check — prevent IDOR (accessing another user's payment status).
-  const isAdmin = req.user.role === 'ADMIN';
+  const isAdmin = req.user.role === 'ADMIN' || req.user.role === 'SUPER_ADMIN';
   if (!isAdmin && order.userId !== req.user.id) {
     throw new AppError('Forbidden', 403);
   }

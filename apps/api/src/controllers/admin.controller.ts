@@ -347,7 +347,7 @@ export async function getCustomerById(req: Request, res: Response) {
   });
 
   if (!customer) throw new AppError('Customer not found', 404);
-  if (customer.role !== 'CUSTOMER') throw new AppError('User is not a customer', 400);
+  if (customer.role !== 'CUSTOMER' && customer.role !== 'ADMIN' && customer.role !== 'SUPER_ADMIN') throw new AppError('User is not a customer', 400);
 
   // Calculate total spent
   const totalResult = await prisma.order.aggregate({

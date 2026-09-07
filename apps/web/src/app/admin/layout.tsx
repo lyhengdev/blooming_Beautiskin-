@@ -41,12 +41,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!isInitialized) return;
-    if (!user || user.role !== 'ADMIN') router.replace('/login?returnTo=/admin');
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) router.replace('/login?returnTo=/admin');
   }, [isInitialized, user, router]);
 
   // Fetch badge counts periodically
   useEffect(() => {
-    if (!user || user.role !== 'ADMIN') return;
+    if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) return;
     const fetchBadges = async () => {
       try {
         const [reviewsRes, messagesRes] = await Promise.all([
@@ -64,7 +64,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => clearInterval(interval);
   }, [user]);
 
-  if (!isInitialized || !user || user.role !== 'ADMIN') {
+  if (!isInitialized || !user || (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN')) {
     return (
       <div className="flex h-screen items-center justify-center bg-blush-50">
         <div className="flex flex-col items-center gap-3">

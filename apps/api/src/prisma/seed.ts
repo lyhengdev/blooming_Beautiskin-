@@ -27,14 +27,14 @@ async function main() {
   await prisma.address.deleteMany();
   await prisma.user.deleteMany();
 
-  // Create admin user
+  // Create super admin user
   const adminPassword = await bcrypt.hash('admin123', 12);
   const admin = await prisma.user.create({
     data: {
       name: 'Admin',
       email: 'admin@bloomingbeauty.com',
       password: adminPassword,
-      role: Role.ADMIN,
+      role: Role.SUPER_ADMIN,
       phone: '+85512345678',
     },
   });
@@ -532,7 +532,7 @@ async function main() {
   });
 
   console.log('Database seeded successfully!');
-  console.log('Admin: admin@bloomingbeauty.com / admin123');
+  console.log('Super Admin: admin@bloomingbeauty.com / admin123');
   console.log('Customer: sophea@example.com / customer123');
 }
 

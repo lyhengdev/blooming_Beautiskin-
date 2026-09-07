@@ -7,8 +7,8 @@ import * as adminController from '../controllers/admin.controller';
 
 const router = Router();
 
-// All admin routes require authentication + ADMIN role
-router.use(authenticate, authorize('ADMIN'));
+// All admin routes require authentication + ADMIN or SUPER_ADMIN role
+router.use(authenticate, authorize('ADMIN', 'SUPER_ADMIN'));
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 router.get('/stats', asyncHandler(adminController.getDashboardStats));

@@ -170,7 +170,7 @@ export default function Header() {
                           className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-blush-50 hover:text-primary-600 transition-colors">
                           My Orders
                         </Link>
-                        {user.role === 'ADMIN' && (
+                        {(user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') && (
                           <Link href="/admin" onClick={() => setUserMenuOpen(false)}
                             className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-blush-50 hover:text-primary-600 transition-colors">
                             Admin Panel
