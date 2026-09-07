@@ -14,8 +14,9 @@ COPY . .
 RUN pnpm install --offline --frozen-lockfile
 
 # API base URL for the frontend, baked into the Next build.
-# Override at deploy time with a build ARG (Render env var works too).
-ARG NEXT_PUBLIC_API_URL=http://localhost:4000/api
+# Use a same-origin path by default so Next.js proxies /api* to the API in the
+# same container. Override with a build ARG only when calling a remote API.
+ARG NEXT_PUBLIC_API_URL=/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Compile the web app to .next/

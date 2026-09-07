@@ -24,6 +24,14 @@ const nextConfig = {
       ],
     },
   ],
+  // The Express API runs in the same container (:4000). Proxy every /api/*
+  // request server-side so a single domain serves both the web app and the API.
+  // Browser requests for /api* always land here first (same-origin base), while
+  // a remote absolute NEXT_PUBLIC_API_URL would bypass Next entirely and work too.
+  async rewrites() {
+    const target = process.env.API_INTERNAL_URL || 'http://localhost:4000/api';
+    return [{ source: '/api/:path*', destination: `${target}/:path*` }];
+  },
   transpilePackages: ['shared'],
 };
 

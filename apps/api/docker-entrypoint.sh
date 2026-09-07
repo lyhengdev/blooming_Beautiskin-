@@ -43,6 +43,27 @@ echo "[entrypoint] Running production setup (upsert admin & home settings)..."
 ( cd /app/apps/api && ./node_modules/.bin/tsx src/prisma/setup-prod.ts ) \
   || { echo "[entrypoint] WARNING: setup-prod failed (non-fatal, continuing)"; }
 
-# ── 4. Start the API server ───────────────────────────────────────────────
-echo "[entrypoint] Starting API server..."
-exec node apps/api/dist/index.js
+# ── 4. Start the API server (background, internal :4000) ───────────────────
+echo "[entrypoint] Starting API server on :4000..."
+cd /app
+node apps/api/dist/index.js &
+API_PID=$!
+
+# ── 5. Wait for the API to accept requests ─────────────────────────────────
+echo "[entrypoint] Waiting for API health..."
+API_READY=0
+for i in $(seq 1 30); do
+  if node -e "fetch('http://localhost:4000/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))" 2>/dev/null; then
+    API_READY=1
+    break
+  fi
+  sleep 1
+done
+[ "$API_READY" = "1" ] && echo "[entrypoint] API is up." || echo "[entrypoint] WARNING: API not healthy within timeout (check logs)."
+
+# ── 6. Start the Next.js web server (foreground, public :3000) ──────────────
+# If the API dies the entrypoint doesn't restart it; the container health check
+# will catch it on Render. Next runs in the foreground so the container lives.
+echo "[entrypoint] Starting Next.js web server on :3000..."
+cd /app/apps/web
+exec node_modules/.bin/next start -p 3000

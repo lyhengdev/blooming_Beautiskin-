@@ -60,6 +60,48 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
+// Normalize messy/typo'd category values found in the CSV
+const CATEGORY_NORMALIZE: Record<string, string> = {
+  suncream: 'Sunscreen',
+  Suncream: 'Sunscreen',
+  auncream: 'Sunscreen',
+  mask: 'Mask',
+  collagen: 'Collagen',
+  lotion: 'Lotion',
+  cream: 'Cream',
+  spa: 'Spa',
+  foam: 'Foam',
+  soap: 'Soap',
+  'haair care': 'Hair Care',
+  'hair care': 'Hair Care',
+  haircare: 'Hair Care',
+  'armpit cream': 'Armpit Cream',
+  toner: 'Toner',
+  lip: 'Lip',
+  Lip: 'Lip',
+  eyecare: 'Eye Care',
+  cleansing: 'Cleansing',
+  Cleansing: 'Cleansing',
+  cleasing: 'Cleansing',
+  cleamser: 'Cleansing',
+  cleanser: 'Cleansing',
+  serum: 'Serum',
+  Serum: 'Serum',
+  'neck cream': 'Neck Cream',
+  essence: 'Essence',
+  'spot powder': 'Spot Powder',
+  'spot cream': 'Spot Cream',
+  scrub: 'Scrub',
+  spray: 'Spray',
+  lipcare: 'Lip Care',
+  'toner pad': 'Toner Pad',
+  'toner  pad': 'Toner Pad',
+  ampoul: 'Ampoule',
+  balm: 'Balm',
+  'clay mask': 'Clay Mask',
+  oil: 'Oil',
+};
+
 // ── Main ───────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -99,7 +141,14 @@ async function main() {
 
     if (!id || !name) continue; // skip empty/blank rows
 
-    rows.push({ id, name, price, stock, category, description });
+    rows.push({
+        id,
+        name,
+        price,
+        stock,
+        category: CATEGORY_NORMALIZE[category] ?? category,
+        description,
+      });
   }
 
   console.log(`Parsed ${rows.length} valid products\n`);
@@ -155,7 +204,15 @@ async function main() {
 
   for (const row of rows) {
     try {
-      const slug = slugify(row.name);
+      let slug = slugify(row.name);
+      const slugExists = await prisma.product.findUnique({
+        where: { slug },
+        select: { id: true },
+      });
+      if (slugExists) {
+        slug = `${slug}-${row.id.toLowerCase()}`;
+      }
+
       const categoryId = row.category
         ? categoryMap.get(row.category) || uncat.id
         : uncat.id;

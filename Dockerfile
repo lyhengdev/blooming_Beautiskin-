@@ -1,6 +1,8 @@
 # syntax=docker/dockerfile:1
-# Blooming Beauty Skin — API (Express + Prisma + Puppeteer invoice rendering)
-# Built as part of the pnpm monorepo. Targets the `api` workspace only.
+# Blooming Beauty Skin — ALL-IN-ONE image (Express API + Next.js web)
+# Runs both services in one container so a single Render service + one domain
+# serves everything. The frontend calls /api on the same origin and Next.js
+# proxies those requests to Express on localhost:4000 (see apps/web/next.config.js).
 
 # ── Build stage ──────────────────────────────────────────────────────────────
 FROM node:20-slim AS builder
@@ -19,6 +21,12 @@ RUN pnpm db:generate
 
 # Compile the API to dist/
 RUN pnpm --filter=api build
+
+# Build the Next.js web app (same-origin API base so one domain works)
+WORKDIR /app/apps/web
+ARG NEXT_PUBLIC_API_URL=/api
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+RUN pnpm --filter=web build
 
 # ── Runtime stage ────────────────────────────────────────────────────────────
 FROM node:20-slim AS runtime
@@ -60,11 +68,12 @@ ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
 
 WORKDIR /app
 
-# Copy production node_modules (workspace-linked) + compiled output
-RUN mkdir -p /app/node_modules /app/apps/api /app/assets
+# Copy production node_modules (workspace-linked) + compiled output for both apps
+RUN mkdir -p /app/node_modules /app/apps /app/assets
 COPY --from=builder /app/pnpm-workspace.yaml /app/package.json /app/pnpm-lock.yaml ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api ./apps/api
+COPY --from=builder /app/apps/web ./apps/web
 
 # Regenerate the Prisma client for the actual runtime platform so the
 # query engine binary matches this Linux image (dev builds are macOS).
@@ -76,10 +85,10 @@ WORKDIR /app
 COPY --from=builder /app/apps/web/public/logo.png /app/assets/logo.png
 ENV LOGO_PATH=/app/assets/logo.png
 
-# Entrypoint auto-runs migrations (+ optional seed) before starting the server,
-# so no manual commands are needed on Render.
+# Entrypoint auto-runs migrations (+ optional seed + prod setup) before
+# starting the API & web servers, so no manual commands are needed on Render.
 COPY apps/api/docker-entrypoint.sh /app/apps/api/docker-entrypoint.sh
 RUN chmod +x /app/apps/api/docker-entrypoint.sh
 
-# Invoke the compiled entrypoint
+# Both the Express API (internal :4000) and Next.js web (:3000, public) run here.
 ENTRYPOINT ["sh", "/app/apps/api/docker-entrypoint.sh"]
