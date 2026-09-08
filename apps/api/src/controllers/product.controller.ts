@@ -683,3 +683,21 @@ export async function toggleProductFeatured(req: AuthRequest, res: Response) {
 
   res.json({ status: 'success', data: { product } });
 }
+
+/**
+ * PATCH /api/products/admin/:id/track-stock
+ * Quickly flip trackStock (per-product stock tracking on/off).
+ */
+export async function toggleProductTrackStock(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+
+  const existing = await prisma.product.findUnique({ where: { id } });
+  if (!existing) throw new AppError('Product not found', 404);
+
+  const product = await prisma.product.update({
+    where: { id },
+    data: { trackStock: !existing.trackStock },
+  });
+
+  res.json({ status: 'success', data: { product } });
+}

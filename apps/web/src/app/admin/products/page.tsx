@@ -6,7 +6,7 @@ import {
   Plus, Trash2, Pencil, Loader2, Package, Search,
   Eye, EyeOff, Star, ChevronLeft, ChevronRight,
   Upload, Link as LinkIcon, ArrowUp, ArrowDown, X,
-  LayoutGrid, Rows3, Download, AlertTriangle,
+  LayoutGrid, Rows3, Download, AlertTriangle, PackageCheck, PackageX,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -555,12 +555,14 @@ function ProductListView({
   onEdit,
   onToggleActive,
   onToggleFeatured,
+  onToggleTrackStock,
   onDelete,
 }: {
   products: ProductListItem[];
   onEdit: (p: ProductListItem) => void;
   onToggleActive: (p: ProductListItem) => void;
   onToggleFeatured: (p: ProductListItem) => void;
+  onToggleTrackStock: (p: ProductListItem) => void;
   onDelete: (p: ProductListItem) => void;
 }) {
   return (
@@ -604,7 +606,14 @@ function ProductListView({
                     <span className="ml-1.5 text-[11px] font-normal text-gray-400 line-through">${parseFloat(p.comparePrice).toFixed(2)}</span>
                   )}
                 </td>
-                <td className={`px-4 py-3 font-semibold ${p.trackStock && p.stock <= 5 ? 'text-red-500' : 'text-gray-600'}`}>{p.stock}</td>
+                <td className={`px-4 py-3 font-semibold ${p.trackStock ? (p.stock <= 5 ? 'text-red-500' : 'text-gray-600') : 'text-gray-400'}`}>
+                  <div className="flex items-center gap-1.5">
+                    {p.trackStock ? p.stock : '—'}
+                    {!p.trackStock && (
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-400">Not tracked</span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5">
                     {p.isActive ? (
@@ -621,6 +630,9 @@ function ProductListView({
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-0.5">
+                    <button onClick={() => onToggleTrackStock(p)} className={`p-1.5 rounded-full hover:bg-blush-100 ${p.trackStock ? 'text-primary-500' : 'text-gray-400 hover:text-primary-500'}`} title={p.trackStock ? 'Turn off stock tracking' : 'Track stock for this product'}>
+                      {p.trackStock ? <PackageCheck className="h-3.5 w-3.5" /> : <PackageX className="h-3.5 w-3.5" />}
+                    </button>
                     <button onClick={() => onEdit(p)} className="p-1.5 rounded-full hover:bg-blush-100 text-gray-400 hover:text-primary-600" title="Edit">
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
@@ -699,6 +711,12 @@ export default function AdminProductsPage() {
     onError: () => toast.error('Failed to update'),
   });
 
+  const toggleTrackStockMutation = useMutation({
+    mutationFn: (p: ProductListItem) => api.patch(`/products/admin/${p.id}/track-stock`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['adminProducts'] }); toast.success('Product updated'); },
+    onError: () => toast.error('Failed to update'),
+  });
+
   const handleEdit = async (p: ProductListItem) => {
     try {
       const res = await api.get(`/products/admin/${p.id}`);
@@ -726,12 +744,12 @@ export default function AdminProductsPage() {
       } while (p <= totalPages);
 
       downloadCSV('products.csv', [
-        ['SKU', 'Name', 'Category', 'Brand', 'Price', 'Compare Price', 'Stock', 'Status', 'Featured', 'Reviews'],
+        ['SKU', 'Name', 'Category', 'Brand', 'Price', 'Compare Price', 'Stock', 'Track Stock', 'Status', 'Featured', 'Reviews'],
         ...all.map((pr) => [
           pr.sku, pr.name, pr.category.name, pr.brand.name,
           parseFloat(pr.price).toFixed(2),
           pr.comparePrice ? parseFloat(pr.comparePrice).toFixed(2) : '',
-          pr.stock, pr.isActive ? 'Active' : 'Inactive',
+          pr.stock, pr.trackStock ? 'Yes' : 'No', pr.isActive ? 'Active' : 'Inactive',
           pr.isFeatured ? 'Yes' : 'No', pr._count.reviews,
         ]),
       ]);
@@ -874,15 +892,24 @@ export default function AdminProductsPage() {
 
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-[11px]">
-                      <span className={`font-semibold ${p.trackStock && p.stock <= 5 ? 'text-red-500' : 'text-gray-500'}`}>
-                        Stock: {p.stock}
-                      </span>
+                      {p.trackStock ? (
+                        <span className={`font-semibold ${p.stock <= 5 ? 'text-red-500' : 'text-gray-500'}`}>
+                          Stock: {p.stock}
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-gray-400 flex items-center gap-1">
+                          <PackageX className="h-3 w-3" /> Not tracked
+                        </span>
+                      )}
                       <span className="text-gray-300">|</span>
                       <span className="text-gray-500">{p._count.reviews} reviews</span>
                     </div>
 
                     {/* Actions */}
                     <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => toggleTrackStockMutation.mutate(p)} className={`p-1.5 rounded-full hover:bg-blush-100 ${p.trackStock ? 'text-primary-500' : 'text-gray-400 hover:text-primary-500'}`} title={p.trackStock ? 'Turn off stock tracking' : 'Track stock for this product'}>
+                        {p.trackStock ? <PackageCheck className="h-3.5 w-3.5" /> : <PackageX className="h-3.5 w-3.5" />}
+                      </button>
                       <button onClick={() => handleEdit(p)} className="p-1.5 rounded-full hover:bg-blush-100 text-gray-400 hover:text-primary-600" title="Edit">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -907,6 +934,7 @@ export default function AdminProductsPage() {
               onEdit={handleEdit}
               onToggleActive={(p) => toggleActiveMutation.mutate(p)}
               onToggleFeatured={(p) => toggleFeaturedMutation.mutate(p)}
+              onToggleTrackStock={(p) => toggleTrackStockMutation.mutate(p)}
               onDelete={setDeleteProduct}
             />
           )}

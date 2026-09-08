@@ -95,6 +95,7 @@ router.delete('/admin/:id', asyncHandler(productController.deleteProduct));
 router.patch('/admin/:id/toggle', asyncHandler(productController.toggleProductActive));
 
 router.patch('/admin/:id/feature', asyncHandler(productController.toggleProductFeatured));
+router.patch('/admin/:id/track-stock', asyncHandler(productController.toggleProductTrackStock));
 
 // ── Public (slug must be last to avoid catching /admin) ──────────────────────
 router.get('/:slug', asyncHandler(productController.getProductBySlug));
