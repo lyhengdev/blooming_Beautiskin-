@@ -622,3 +622,44 @@ export async function updateOrderStatus(req: AuthRequest, res: Response) {
 
   res.json({ status: 'success', data: { order } });
 }
+
+/**
+ * DELETE /api/orders/admin/:id
+ * Permanently delete an order. Restores stock for tracked products and
+ * removes the associated payment record before deleting the order.
+ */
+export async function deleteOrderAdmin(req: Request, res: Response) {
+  const { id } = req.params;
+
+  const existing = await prisma.order.findUnique({
+    where: { id },
+    include: {
+      items: { include: { product: { select: { trackStock: true } }, variant: true } },
+    },
+  });
+
+  if (!existing) throw new AppError('Order not found', 404);
+
+  await prisma.$transaction(async (tx) => {
+    for (const item of existing.items) {
+      if (!item.product.trackStock) continue;
+
+      if (item.variantId) {
+        await tx.productVariant.updateMany({
+          where: { id: item.variantId },
+          data: { stock: { increment: item.quantity } },
+        });
+      } else {
+        await tx.product.updateMany({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        });
+      }
+    }
+
+    await tx.payment.deleteMany({ where: { orderId: id } });
+    await tx.order.delete({ where: { id } });
+  });
+
+  res.json({ status: 'success', data: { message: 'Order deleted' } });
+}

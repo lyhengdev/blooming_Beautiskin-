@@ -27,6 +27,8 @@ router.patch(
   asyncHandler(orderController.updateOrderStatus)
 );
 
+router.delete('/admin/:id', asyncHandler(orderController.deleteOrderAdmin));
+
 // ── User endpoints ────────────────────────────────────────────────────────────
 
 router.post(

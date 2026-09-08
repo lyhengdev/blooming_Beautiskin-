@@ -5,7 +5,7 @@ import Image from 'next/image';
 import {
   Loader2, Search, ShoppingBag, Clock, Package, Truck,
   CheckCircle2, XCircle, RotateCcw, ChevronLeft, ChevronRight,
-  X, DollarSign, Eye, Calendar, Download,
+  X, DollarSign, Eye, Calendar, Download, Trash2,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -81,6 +81,7 @@ function OrderDetailModal({
 }) {
   const queryClient = useQueryClient();
   const [newStatus, setNewStatus] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data: orderRes, isLoading } = useQuery({
     queryKey: ['adminOrder', orderId],
@@ -116,6 +117,20 @@ function OrderDetailModal({
 
   const nextStatuses = order ? allowedTransitions[order.status] ?? [] : [];
 
+  const deleteMutation = useMutation({
+    mutationFn: () => api.delete(`/orders/admin/${orderId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminOrders'] });
+      queryClient.invalidateQueries({ queryKey: ['adminOrderStats'] });
+      toast.success('Order deleted');
+      onClose();
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || 'Failed to delete order';
+      toast.error(msg);
+    },
+  });
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-8 bg-black/40 backdrop-blur-sm overflow-y-auto">
       <div className="relative w-full max-w-3xl bg-white rounded-4xl shadow-pink-lg mb-8">
@@ -129,9 +144,20 @@ function OrderDetailModal({
               <p className="text-xs text-gray-400 mt-0.5">{formatDate(order.createdAt)}</p>
             )}
           </div>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-blush-100 transition-colors">
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
+          <div className="flex items-center gap-1">
+            {order && (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="p-2 rounded-full text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                title="Delete order"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            )}
+            <button onClick={onClose} className="p-2 rounded-full hover:bg-blush-100 transition-colors">
+              <X className="h-5 w-5 text-gray-500" />
+            </button>
+          </div>
         </div>
 
         {isLoading ? (
@@ -263,6 +289,43 @@ function OrderDetailModal({
           </div>
         )}
       </div>
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="absolute inset-0 z-20 flex items-center justify-center p-4 bg-black/30 rounded-4xl">
+          <div className="w-full max-w-sm bg-white rounded-4xl shadow-pink-lg p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-50">
+                <Trash2 className="h-5 w-5 text-red-500" />
+              </div>
+              <div>
+                <h3 className="font-heading font-extrabold text-gray-900">Delete Order</h3>
+                <p className="text-xs text-gray-500">This action cannot be undone.</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-2">
+              Are you sure you want to permanently delete order{' '}
+              <span className="font-bold">{order?.orderNumber}</span>?
+            </p>
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2 mb-5">
+              Stock for the items in this order will be restored. Payment records will also be removed.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setConfirmDelete(false)} disabled={deleteMutation.isPending}
+                className="btn-secondary px-5 py-2.5 text-sm">Cancel</button>
+              <button
+                onClick={() => deleteMutation.mutate()}
+                disabled={deleteMutation.isPending}
+                className="inline-flex items-center gap-2 rounded-full bg-red-500 px-5 py-2.5 text-sm font-bold text-white
+                           hover:bg-red-600 transition-colors disabled:opacity-50 shadow-sm"
+              >
+                {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
