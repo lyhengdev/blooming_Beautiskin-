@@ -1,4 +1,50 @@
 /** @type {import('next').NextConfig} */
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
+  register: true,
+  skipWaiting: true,
+  // Don't let Workbox try to precache Next's middleware/build manifests.
+  buildExcludes: [
+    /middleware-manifest\.json$/,
+    /_buildManifest\.js$/,
+    /_ssgManifest\.js$/,
+    /middleware-build-manifest\.js$/,
+    /middleware-[a-z0-9]+\.js$/,
+  ],
+  runtimeCaching: [
+    {
+      // Next.js static JS/CSS chunks
+      urlPattern: /\/_next\/static\/.+\.(?:css|js|mjs)$/,
+      handler: 'StaleWhileRevalidate',
+      options: { cacheName: 'static-resources' },
+    },
+    {
+      // Product / banner images (mostly Cloudinary etc.)
+      urlPattern: /\.(?:png|jpg|jpeg|gif|svg|webp|avif|ico)(?:\?.*)?$/,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'images',
+        expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 },
+        cacheableResponse: { statuses: [200] },
+      },
+    },
+    {
+      // Public storefront GET endpoints — serve fresh when online, fall back
+      // to the last fetched copy offline. Private/stateful paths (auth, cart,
+      // orders, admin, coupon validation) deliberately fall through.
+      urlPattern: /\/api\/(?!auth\/|admin\/|carts\/|orders\/|wishlist\/|coupons\/)[^?]+$/,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'api-cache',
+        networkTimeoutSeconds: 10,
+        expiration: { maxEntries: 100, maxAgeSeconds: 24 * 60 * 60 },
+        cacheableResponse: { statuses: [200] },
+      },
+    },
+  ],
+});
+
 const nextConfig = {
   images: {
     remotePatterns: [
@@ -35,4 +81,4 @@ const nextConfig = {
   transpilePackages: ['shared'],
 };
 
-module.exports = nextConfig;
+module.exports = withPWA(nextConfig);

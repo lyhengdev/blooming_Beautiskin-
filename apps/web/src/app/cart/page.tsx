@@ -79,7 +79,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen pb-24 lg:pb-0">
       <Header />
       <main className="flex-1">
         <div className="container-shop py-8">
@@ -199,6 +199,25 @@ export default function CartPage() {
           </div>
         </div>
       </main>
+
+      {/* Sticky mobile checkout bar */}
+      {!isLoading && items.length > 0 && (
+        <div className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-white/95 backdrop-blur-md border-t border-blush-100 shadow-pink-md">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[11px] text-gray-400 font-medium">Total</p>
+              <p className="font-extrabold text-primary-600 text-lg leading-tight">${total.toFixed(2)}</p>
+              {subtotal < 30 && (
+                <p className="text-[10px] text-primary-700 font-medium">Add ${(30 - subtotal).toFixed(2)} for free shipping</p>
+              )}
+            </div>
+            <Link href="/checkout" className="flex-1 btn-primary text-center py-3 text-sm">
+              Proceed to Checkout
+            </Link>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </div>
   );

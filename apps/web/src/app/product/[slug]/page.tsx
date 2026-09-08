@@ -200,7 +200,7 @@ export default function ProductDetailPage() {
   }));
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen pb-24 lg:pb-0">
       <Header />
       <main className="flex-1">
         <div className="container-shop py-4">
@@ -454,6 +454,30 @@ export default function ProductDetailPage() {
           </section>
         )}
       </main>
+
+      {/* Sticky mobile purchase bar */}
+      <div className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-white/95 backdrop-blur-md border-t border-blush-100 shadow-pink-md">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-[11px] text-gray-400 font-medium">Total</p>
+            <p className="font-extrabold text-primary-600 text-lg leading-tight">${product.price}</p>
+            {product.trackStock && product.stock === 0 && (
+              <p className="text-[10px] text-red-500 font-medium">Out of stock</p>
+            )}
+          </div>
+          <button onClick={handleAddToCart}
+            disabled={(product.trackStock && product.stock === 0) || addingToCart || buyingNow}
+            className="flex-1 btn-primary py-3 flex items-center justify-center gap-2 text-sm disabled:opacity-50">
+            {addedMsg ? <><ShoppingBag className="h-4 w-4" /> Added!</> : addingToCart ? <><ShoppingBag className="h-4 w-4" /> Adding...</> : <><ShoppingBag className="h-4 w-4" /> Add to Cart</>}
+          </button>
+          <button onClick={handleBuyNow}
+            disabled={(product.trackStock && product.stock === 0) || buyingNow || addingToCart}
+            className="flex-1 btn-secondary py-3 flex items-center justify-center gap-2 text-sm disabled:opacity-50">
+            <Zap className="h-4 w-4" /> Buy Now
+          </button>
+        </div>
+      </div>
+
       <Footer />
     </div>
   );

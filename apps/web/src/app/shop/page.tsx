@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { useState, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { SlidersHorizontal, X, Grid3X3, LayoutList, Package } from 'lucide-react';
+import { SlidersHorizontal, X, Grid3X3, LayoutList, Package, ChevronLeft, ChevronRight } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import api from '@/lib/api';
@@ -143,7 +143,7 @@ function ShopContent() {
                     <SlidersHorizontal className="h-4 w-4" /> Filters
                   </button>
                   {activeFilters.length > 0 && (
-                    <div className="hidden sm:flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {activeFilters.map((f) => (
                         <span key={f} className="flex items-center gap-1 px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-xs">
                           {f}
@@ -234,15 +234,38 @@ function ShopContent() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex justify-center gap-2 mt-10">
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${page === currentPage ? 'bg-primary-600 text-white' : 'bg-white border hover:bg-gray-50'}`}>
-                      {page}
+                <>
+                  {/* Mobile: compact prev/next */}
+                  <div className="flex items-center justify-center gap-3 mt-10 lg:hidden">
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage <= 1}
+                      className="flex items-center gap-1 px-4 py-2.5 rounded-lg border text-sm font-medium disabled:opacity-40"
+                    >
+                      <ChevronLeft className="h-4 w-4" /> Prev
                     </button>
-                  ))}
-                </div>
+                    <span className="text-sm text-gray-600 font-medium">
+                      Page {currentPage} / {totalPages}
+                    </span>
+                    <button
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage >= totalPages}
+                      className="flex items-center gap-1 px-4 py-2.5 rounded-lg border text-sm font-medium disabled:opacity-40"
+                    >
+                      Next <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                  {/* Desktop: full pagination */}
+                  <div className="hidden lg:flex justify-center gap-2 mt-10">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <button key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${page === currentPage ? 'bg-primary-600 text-white' : 'bg-white border hover:bg-gray-50'}`}>
+                        {page}
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           </div>

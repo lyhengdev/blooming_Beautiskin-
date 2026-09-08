@@ -6,6 +6,7 @@ import {
   Loader2, Search, Plus, Minus, Trash2, X, Package,
   ShoppingCart, User, Phone, MapPin, DollarSign,
   MessageSquare, CheckCircle2, ChevronDown, Users, UserPlus,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -58,14 +59,16 @@ export default function OnlineSellingPage() {
 
   // Product search
   const [search, setSearch] = useState('');
+  const [productPage, setProductPage] = useState(1);
   const { data: productsRes, isLoading: loadingProducts } = useQuery({
-    queryKey: ['onlineSellingProducts', search],
+    queryKey: ['onlineSellingProducts', search, productPage],
     queryFn: () =>
       api.get('/products/admin', {
-        params: { limit: 50, isActive: true, search: search || undefined, sort: 'name' },
+        params: { page: productPage, limit: 50, isActive: true, search: search || undefined, sort: 'name' },
       }),
   });
   const products: Product[] = productsRes?.data?.data?.products ?? [];
+  const productPagination = productsRes?.data?.data?.pagination ?? { page: 1, total: 0, totalPages: 1 };
 
   // Cart
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -235,7 +238,7 @@ export default function OnlineSellingPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setProductPage(1); }}
                 placeholder="Search products..."
                 className="input-field w-full pl-9"
               />
@@ -294,6 +297,33 @@ export default function OnlineSellingPage() {
                     </button>
                   );
                 })}
+              </div>
+            )}
+
+            {!loadingProducts && products.length > 0 && productPagination.totalPages > 1 && (
+              <div className="mt-3 pt-3 border-t border-blush-100 flex items-center justify-between">
+                <p className="text-xs text-gray-400">
+                  Showing {Math.min(50, productPagination.total - (productPagination.page - 1) * 50)} of {productPagination.total}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setProductPage((p) => Math.max(1, p - 1))}
+                    disabled={productPagination.page <= 1}
+                    className="flex items-center gap-1 rounded-full border border-blush-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-blush-50 disabled:opacity-40"
+                  >
+                    <ChevronLeft className="h-3.5 w-3.5" /> Prev
+                  </button>
+                  <span className="text-xs text-gray-500 font-semibold">
+                    {productPagination.page} / {productPagination.totalPages}
+                  </span>
+                  <button
+                    onClick={() => setProductPage((p) => Math.min(productPagination.totalPages, p + 1))}
+                    disabled={productPagination.page >= productPagination.totalPages}
+                    className="flex items-center gap-1 rounded-full border border-blush-200 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-blush-50 disabled:opacity-40"
+                  >
+                    Next <ChevronRight className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             )}
           </div>

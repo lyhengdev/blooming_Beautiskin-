@@ -76,6 +76,29 @@ function findLogo(): string | null {
   return null;
 }
 
+// ── Khmer font (for Khmer names/addresses on the receipt) ───────────────────
+// Headless Chromium in the Docker image has no Khmer-capable system font, so
+// we bundle Battambang (the storefront's Khmer font) and embed it as a data —
+// URI. Candidates cover both the dev (tsx from src/) and the compiled dist/
+// (Docker) layouts.
+const FONT_CANDIDATES = [
+  join(resolve(__dirname), 'fonts'),
+  join(resolve(__dirname), '../../src/lib/fonts'),
+];
+
+function fontDataUri(filename: string): string | null {
+  for (const dir of FONT_CANDIDATES) {
+    const p = join(dir, filename);
+    if (existsSync(p)) return 'data:font/woff2;base64,' + readFileSync(p).toString('base64');
+  }
+  return null;
+}
+
+const FONT_DATA = {
+  regular: fontDataUri('Battambang-Regular.woff2'),
+  bold: fontDataUri('Battambang-Bold.woff2'),
+};
+
 // ── Browser pool (single reusable Chromium instance) ────────────────────────
 let browserPromise: Promise<Browser> | null = null;
 
@@ -134,11 +157,13 @@ function buildHtml(
 <head>
 <meta charset="utf-8"/>
 <style>
+  ${FONT_DATA.regular ? `@font-face { font-family:'Battambang'; font-style:normal; font-weight:400; font-display:swap; src:url(${FONT_DATA.regular}); }` : ''}
+  ${FONT_DATA.bold ? `@font-face { font-family:'Battambang'; font-style:normal; font-weight:700; font-display:swap; src:url(${FONT_DATA.bold}); }` : ''}
   html, body { margin: 0; padding: 0; width: ${widthPx}px; }
   body {
     background: #ffffff;
     color: #000000;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Battambang', sans-serif;
     box-sizing: border-box;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
@@ -250,8 +275,12 @@ export async function renderInvoice(data: InvoiceData): Promise<RenderedInvoice>
     });
     await page.setContent(html, { waitUntil: 'load' });
 
-    await page.evaluate(() => {
-      (document as any).fonts?.ready?.catch(() => undefined);
+    await page.evaluate(async () => {
+      const doc = document as any;
+      if (doc.fonts?.ready) {
+        await doc.fonts.ready.catch(() => undefined);
+        try { await doc.fonts.load('12px "Battambang"'); } catch { /* font may be optional */ }
+      }
     });
 
     const dims = await page.evaluate(() => ({

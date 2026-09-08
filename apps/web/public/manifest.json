@@ -1,0 +1,31 @@
+{
+  "name": "Blooming Beauty Skin — Authentic K-Beauty & Cosmetics in Cambodia",
+  "short_name": "BBS Skin",
+  "description": "Shop authentic Korean and Japanese skincare & cosmetics in Cambodia. Cleansers, serums, moisturizers, SPF & more.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#e8749a",
+  "lang": "en",
+  "categories": ["shopping", "beauty", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512x512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -38,3 +38,7 @@ coverage/
 
 # vercel
 .vercel/
+
+# next-pwa generated service worker (rebuilt on every build)
+apps/web/public/sw.js
+apps/web/public/workbox-*.js
