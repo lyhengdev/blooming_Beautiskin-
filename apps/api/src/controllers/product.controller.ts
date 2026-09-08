@@ -342,6 +342,7 @@ export async function getAllProductsAdmin(req: Request, res: Response) {
     brand,
     isActive,
     isFeatured,
+    lowStock,
     sort = 'newest',
   } = req.query;
 
@@ -361,6 +362,11 @@ export async function getAllProductsAdmin(req: Request, res: Response) {
 
   if (category) {
     where.categoryId = category as string;
+  }
+
+  if (lowStock === 'true') {
+    where.trackStock = true;
+    where.stock = { lte: 5 };
   }
 
   if (brand) {

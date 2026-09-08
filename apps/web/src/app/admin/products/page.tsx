@@ -6,10 +6,12 @@ import {
   Plus, Trash2, Pencil, Loader2, Package, Search,
   Eye, EyeOff, Star, ChevronLeft, ChevronRight,
   Upload, Link as LinkIcon, ArrowUp, ArrowDown, X,
+  LayoutGrid, Rows3, Download, AlertTriangle,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { toast } from 'sonner';
+import { downloadCSV } from '@/lib/csv';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -546,6 +548,102 @@ function DeleteConfirmModal({
   );
 }
 
+// ── Product List View (table) ───────────────────────────────────────────────
+
+function ProductListView({
+  products,
+  onEdit,
+  onToggleActive,
+  onToggleFeatured,
+  onDelete,
+}: {
+  products: ProductListItem[];
+  onEdit: (p: ProductListItem) => void;
+  onToggleActive: (p: ProductListItem) => void;
+  onToggleFeatured: (p: ProductListItem) => void;
+  onDelete: (p: ProductListItem) => void;
+}) {
+  return (
+    <div className="rounded-3xl border border-blush-100 bg-white shadow-pink-sm overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-blush-100 text-sm">
+          <thead>
+            <tr className="bg-blush-50/60 text-left text-[11px] uppercase tracking-wider text-gray-400">
+              <th className="px-4 py-3 font-bold">Product</th>
+              <th className="px-4 py-3 font-bold">Category</th>
+              <th className="px-4 py-3 font-bold">Brand</th>
+              <th className="px-4 py-3 font-bold">Price</th>
+              <th className="px-4 py-3 font-bold">Stock</th>
+              <th className="px-4 py-3 font-bold">Status</th>
+              <th className="px-4 py-3 font-bold text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-blush-50">
+            {products.map((p) => (
+              <tr key={p.id} className="group hover:bg-blush-50/50 transition-colors">
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-blush-50">
+                      {p.images[0] ? (
+                        <Image src={p.images[0].url} alt={p.name} fill className="object-cover" unoptimized />
+                      ) : (
+                        <div className="flex h-full items-center justify-center"><Package className="h-5 w-5 text-blush-300" /></div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="max-w-[220px] truncate font-bold text-gray-900">{p.name}</p>
+                      <p className="text-[11px] text-gray-400">{p.sku} · {p._count.reviews} reviews</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-gray-600">{p.category.name}</td>
+                <td className="px-4 py-3 text-gray-600">{p.brand.name}</td>
+                <td className="px-4 py-3 font-semibold text-gray-900">
+                  ${parseFloat(p.price).toFixed(2)}
+                  {p.comparePrice && (
+                    <span className="ml-1.5 text-[11px] font-normal text-gray-400 line-through">${parseFloat(p.comparePrice).toFixed(2)}</span>
+                  )}
+                </td>
+                <td className={`px-4 py-3 font-semibold ${p.trackStock && p.stock <= 5 ? 'text-red-500' : 'text-gray-600'}`}>{p.stock}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1.5">
+                    {p.isActive ? (
+                      <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-600">Active</span>
+                    ) : (
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-bold text-gray-500">Inactive</span>
+                    )}
+                    {p.isFeatured && (
+                      <span className="flex items-center gap-0.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-600">
+                        <Star className="h-2.5 w-2.5" /> Featured
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-0.5">
+                    <button onClick={() => onEdit(p)} className="p-1.5 rounded-full hover:bg-blush-100 text-gray-400 hover:text-primary-600" title="Edit">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => onToggleActive(p)} className="p-1.5 rounded-full hover:bg-blush-100 text-gray-400 hover:text-primary-600" title={p.isActive ? 'Deactivate' : 'Activate'}>
+                      {p.isActive ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                    </button>
+                    <button onClick={() => onToggleFeatured(p)} className={`p-1.5 rounded-full hover:bg-blush-100 ${p.isFeatured ? 'text-amber-500' : 'text-gray-400 hover:text-amber-500'}`} title={p.isFeatured ? 'Unfeature' : 'Feature'}>
+                      <Star className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => onDelete(p)} className="p-1.5 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500" title="Delete">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Products Page ───────────────────────────────────────────────────────
 
 export default function AdminProductsPage() {
@@ -559,11 +657,26 @@ export default function AdminProductsPage() {
   const [filterBrand, setFilterBrand] = useState('');
   const [filterActive, setFilterActive] = useState('');
   const [filterFeatured, setFilterFeatured] = useState('');
+  const [filterLowStock, setFilterLowStock] = useState(() =>
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('low') === '1'
+  );
   const [sort, setSort] = useState('newest');
+  const [exporting, setExporting] = useState(false);
+  const [view, setView] = useState<'grid' | 'list'>(() => {
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('admin-products-view') === 'list' ? 'list' : 'grid';
+    }
+    return 'grid';
+  });
+
+  const setViewMode = (v: 'grid' | 'list') => {
+    setView(v);
+    try { window.localStorage.setItem('admin-products-view', v); } catch { /* ignore */ }
+  };
 
   const { data: productsRes, isLoading: loading } = useQuery({
-    queryKey: ['adminProducts', page, search, filterCategory, filterBrand, filterActive, filterFeatured, sort],
-    queryFn: () => api.get('/products/admin', { params: { page, limit: 12, search: search || undefined, category: filterCategory || undefined, brand: filterBrand || undefined, isActive: filterActive || undefined, isFeatured: filterFeatured || undefined, sort } }),
+    queryKey: ['adminProducts', page, search, filterCategory, filterBrand, filterActive, filterFeatured, filterLowStock, sort],
+    queryFn: () => api.get('/products/admin', { params: { page, limit: 12, search: search || undefined, category: filterCategory || undefined, brand: filterBrand || undefined, isActive: filterActive || undefined, isFeatured: filterFeatured || undefined, lowStock: filterLowStock || undefined, sort } }),
   });
 
   const { data: categoriesRes } = useQuery({ queryKey: ['adminCategories'], queryFn: () => api.get('/categories/admin') });
@@ -598,6 +711,38 @@ export default function AdminProductsPage() {
 
   const handleSaved = () => { setShowForm(false); setEditProduct(null); };
 
+  const handleExportCSV = async () => {
+    setExporting(true);
+    try {
+      const all: ProductListItem[] = [];
+      let p = 1;
+      let totalPages = 1;
+      do {
+        const res = await api.get('/products/admin', { params: { page: p, limit: 100, sort } });
+        const data = res?.data?.data;
+        all.push(...(data?.products ?? []));
+        totalPages = data?.pagination?.totalPages ?? 1;
+        p++;
+      } while (p <= totalPages);
+
+      downloadCSV('products.csv', [
+        ['SKU', 'Name', 'Category', 'Brand', 'Price', 'Compare Price', 'Stock', 'Status', 'Featured', 'Reviews'],
+        ...all.map((pr) => [
+          pr.sku, pr.name, pr.category.name, pr.brand.name,
+          parseFloat(pr.price).toFixed(2),
+          pr.comparePrice ? parseFloat(pr.comparePrice).toFixed(2) : '',
+          pr.stock, pr.isActive ? 'Active' : 'Inactive',
+          pr.isFeatured ? 'Yes' : 'No', pr._count.reviews,
+        ]),
+      ]);
+      toast.success(`Exported ${all.length} products`);
+    } catch {
+      toast.error('Failed to export products');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
       {/* Header */}
@@ -606,9 +751,30 @@ export default function AdminProductsPage() {
           <h1 className="text-2xl font-heading font-extrabold text-gray-900">Products</h1>
           <p className="mt-1 text-sm text-gray-500">Manage your product catalog.</p>
         </div>
-        <button onClick={() => { setEditProduct(null); setShowForm(true); }} className="btn-primary px-5 py-2.5 text-sm">
-          <Plus className="h-4 w-4" /> Add Product
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center rounded-full border border-blush-200 bg-white p-0.5 shadow-pink-sm">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${view === 'grid' ? 'bg-primary-500 text-white' : 'text-gray-500 hover:bg-blush-100'}`}
+              title="Icon view">
+              <LayoutGrid className="h-3.5 w-3.5" /> Icons
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${view === 'list' ? 'bg-primary-500 text-white' : 'text-gray-500 hover:bg-blush-100'}`}
+              title="List view">
+              <Rows3 className="h-3.5 w-3.5" /> List
+            </button>
+          </div>
+          <button onClick={handleExportCSV} disabled={exporting}
+            className="inline-flex items-center gap-1.5 rounded-full border border-blush-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-600 shadow-pink-sm hover:bg-blush-50 transition-colors disabled:opacity-50">
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+          <button onClick={() => { setEditProduct(null); setShowForm(true); }} className="btn-primary px-5 py-2.5 text-sm">
+            <Plus className="h-4 w-4" /> Add Product
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -641,6 +807,17 @@ export default function AdminProductsPage() {
         </select>
       </div>
 
+      {/* Active filter chips */}
+      {filterLowStock && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <button onClick={() => { setFilterLowStock(false); setPage(1); }}
+            className="inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-bold text-red-600 hover:bg-red-100 transition-colors">
+            <AlertTriangle className="h-3 w-3" /> Low stock (≤ 5)
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
@@ -650,15 +827,16 @@ export default function AdminProductsPage() {
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <Package className="h-12 w-12 text-blush-300 mb-3" />
           <p className="font-heading font-bold text-gray-500 text-lg">
-            {search || filterCategory || filterBrand ? 'No products match your filters' : 'No products yet'}
+            {search || filterCategory || filterBrand || filterLowStock ? 'No products match your filters' : 'No products yet'}
           </p>
           <p className="text-sm text-gray-400 mt-1">
-            {search || filterCategory || filterBrand ? 'Try adjusting your filters.' : 'Add your first product to get started.'}
+            {search || filterCategory || filterBrand || filterLowStock ? 'Try adjusting your filters.' : 'Add your first product to get started.'}
           </p>
         </div>
       ) : (
         <>
-          {/* Product grid */}
+          {/* Product view */}
+          {view === 'grid' ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((p) => (
               <div key={p.id} className="group relative rounded-3xl border border-blush-100 bg-white shadow-pink-sm hover:shadow-pink-md transition-all overflow-hidden">
@@ -722,7 +900,16 @@ export default function AdminProductsPage() {
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          ) : (
+            <ProductListView
+              products={products}
+              onEdit={handleEdit}
+              onToggleActive={(p) => toggleActiveMutation.mutate(p)}
+              onToggleFeatured={(p) => toggleFeaturedMutation.mutate(p)}
+              onDelete={setDeleteProduct}
+            />
+          )}
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (

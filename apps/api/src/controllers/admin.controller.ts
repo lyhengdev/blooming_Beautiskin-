@@ -201,6 +201,37 @@ export async function getDashboardStats(_req: Request, res: Response) {
     return acc;
   }, {} as Record<string, number>);
 
+  // Last 7 days of revenue (day-by-day) for the dashboard chart.
+  const revenueTrend = await (async () => {
+    const days: { date: string; revenue: number; orders: number }[] = [];
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - 6);
+
+    const raw = await prisma.order.findMany({
+      where: {
+        status: { notIn: ['CANCELLED', 'REFUNDED'] },
+        createdAt: { gte: start },
+      },
+      select: { createdAt: true, total: true },
+    });
+
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(start);
+      day.setDate(start.getDate() + i);
+      day.setHours(0, 0, 0, 0);
+      const next = new Date(day);
+      next.setDate(day.getDate() + 1);
+      const entries = raw.filter((o) => o.createdAt >= day && o.createdAt < next);
+      days.push({
+        date: day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        revenue: entries.reduce((sum, o) => sum + Number(o.total), 0),
+        orders: entries.length,
+      });
+    }
+    return days;
+  })();
+
   res.json({
     status: 'success',
     data: {
@@ -214,6 +245,7 @@ export async function getDashboardStats(_req: Request, res: Response) {
       revenueLast30d: Number(revenueLast30d._sum.total ?? 0),
       statusCounts,
       recentOrders,
+      revenueTrend,
     },
   });
 }

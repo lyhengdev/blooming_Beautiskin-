@@ -32,27 +32,38 @@ else
   echo "[entrypoint] Skipping schema sync (SKIP_MIGRATIONS=true)"
 fi
 
-# ── 2. Optional seed on empty DB ──────────────────────────────────────────
-# The seed script wipes & recreates data, so we ONLY run it when requested AND
-# when the DB has no users yet. Safe to leave enabled on the first deploy.
+# ── 2. Optional seed (opt-in only) ─────────────────────────────────────────
+# The seed script WIPES and recreates ALL data (products, orders, users, etc.).
+# To make accidental data loss during deploys impossible:
+#   - Seeding now requires BOTH SEED_ON_STARTUP=true AND FORCE_RESEED=true.
+#   - Against a hosted/remote DATABASE_URL it additionally requires
+#     ALLOW_REMOTE_RESEED=true (double opt-in). Leaving SEED_ON_STARTUP=true
+#     enabled from the old setup is now harmless by itself.
 if [ "${SEED_ON_STARTUP}" = "true" ]; then
-  echo "[entrypoint] Checking whether the database needs seeding..."
-  USER_COUNT="$(cd /app/apps/api && node -e "
-    const { PrismaClient } = require('@prisma/client');
-    const p = new PrismaClient();
-    p.user.count().then(c => { console.log(String(c)); return p.\$disconnect(); })
-      .catch(e => { console.error(e.message); process.exit(1); });
-  " 2>&1)"
-  echo "[entrypoint] Existing users: ${USER_COUNT}"
-  if [ "${USER_COUNT}" = "0" ]; then
-    echo "[entrypoint] Seeding database (empty)..."
+  if [ "${FORCE_RESEED}" != "true" ]; then
+    echo "[entrypoint] SEED_ON_STARTUP is set but FORCE_RESEED!=true — seeding is now opt-in to protect existing data. Skipping."
+    echo "[entrypoint] (To intentionally wipe & re-seed, set SEED_ON_STARTUP=true and FORCE_RESEED=true.)"
+  else
+    DB_URL="${DATABASE_URL}"
+    case "${DB_URL}" in
+      *neon.tech*|*supabase.co*|*amazonaws.com*|*rds.*|*render.com*|*aivencloud.com*)
+        if [ "${ALLOW_REMOTE_RESEED}" != "true" ]; then
+          echo "[entrypoint] ERROR: FORCE_RESEED=true but DATABASE_URL is a hosted/remote DB and ALLOW_REMOTE_RESEED!=true."
+          echo "[entrypoint] Refusing to wipe a remote database. Set ALLOW_REMOTE_RESEED=true to override."
+          exit 1
+        fi
+        echo "[entrypoint] CAUTION: wiping REMOTE database (ALLOW_REMOTE_RESEED=true)..."
+        ;;
+      *)
+        echo "[entrypoint] Local/Docker DB detected — safe to reseed."
+        ;;
+    esac
+    echo "[entrypoint] Seeding database (FORCE_RESEED=true)..."
     ( cd /app/apps/api && ./node_modules/.bin/tsx src/prisma/seed.ts ) \
       || { echo "[entrypoint] ERROR: seed failed"; exit 1; }
-  else
-    echo "[entrypoint] Database already has data — skipping seed"
   fi
 else
-  echo "[entrypoint] Skipping seed (set SEED_ON_STARTUP=true to auto-seed an empty DB)"
+  echo "[entrypoint] Skipping seed (set SEED_ON_STARTUP=true AND FORCE_RESEED=true to re-seed)"
 fi
 
 # ── 3. Setup prod (safe upsert — creates/updates admin + home settings) ──

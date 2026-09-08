@@ -5,11 +5,12 @@ import Image from 'next/image';
 import {
   Loader2, Search, ShoppingBag, Clock, Package, Truck,
   CheckCircle2, XCircle, RotateCcw, ChevronLeft, ChevronRight,
-  X, DollarSign, Eye, Calendar,
+  X, DollarSign, Eye, Calendar, Download,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { toast } from 'sonner';
+import { downloadCSV } from '@/lib/csv';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -271,11 +272,18 @@ function OrderDetailModal({
 export default function AdminOrdersPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterStatus, setFilterStatus] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const s = new URLSearchParams(window.location.search).get('status');
+      if (s && STATUS_OPTIONS.includes(s)) return s;
+    }
+    return '';
+  });
   const [detailOrderId, setDetailOrderId] = useState<string | null>(null);
   const [datePreset, setDatePreset] = useState<string>('');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [exporting, setExporting] = useState(false);
 
   // Compute date range from preset
   const dateRange = useMemo(() => {
@@ -312,12 +320,59 @@ export default function AdminOrdersPage() {
   const orders: Order[] = ordersRes?.data?.data?.orders ?? [];
   const pagination = ordersRes?.data?.data?.pagination ?? { page: 1, total: 0, totalPages: 1 };
 
+  const handleExportCSV = async () => {
+    setExporting(true);
+    try {
+      const all: Order[] = [];
+      let p = 1;
+      let totalPages = 1;
+      do {
+        const res = await api.get('/orders/admin', { params: { page: p, limit: 100, search: search || undefined, status: filterStatus || undefined, ...dateRange } });
+        const data = res?.data?.data;
+        all.push(...(data?.orders ?? []));
+        totalPages = data?.pagination?.totalPages ?? 1;
+        p++;
+      } while (p <= totalPages);
+
+      downloadCSV('orders.csv', [
+        ['Order Number', 'Date', 'Customer', 'Phone', 'City', 'Province', 'Items', 'Subtotal', 'Shipping', 'Discount', 'Total', 'Status', 'Payment'],
+        ...all.map((o) => [
+          o.orderNumber,
+          new Date(o.createdAt).toLocaleString('en-US'),
+          o.shippingName,
+          o.shippingPhone,
+          o.shippingCity,
+          o.shippingProvince,
+          o._count.items,
+          parseFloat(o.subtotal).toFixed(2),
+          o.shippingCost === '0' ? 'Free' : parseFloat(o.shippingCost).toFixed(2),
+          o.discount !== '0' ? parseFloat(o.discount).toFixed(2) : '',
+          parseFloat(o.total).toFixed(2),
+          o.status,
+          o.payment?.method?.replace('_', ' ') ?? '',
+        ]),
+      ]);
+      toast.success(`Exported ${all.length} orders`);
+    } catch {
+      toast.error('Failed to export orders');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div>
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-heading font-extrabold text-gray-900">Orders</h1>
-        <p className="mt-1 text-sm text-gray-500">View and manage customer orders.</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-heading font-extrabold text-gray-900">Orders</h1>
+          <p className="mt-1 text-sm text-gray-500">View and manage customer orders.</p>
+        </div>
+        <button onClick={handleExportCSV} disabled={exporting}
+          className="inline-flex items-center gap-1.5 rounded-full border border-blush-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-600 shadow-pink-sm hover:bg-blush-50 transition-colors disabled:opacity-50 self-end">
+          {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+          {exporting ? 'Exporting...' : 'Export CSV'}
+        </button>
       </div>
 
       {/* Stats */}

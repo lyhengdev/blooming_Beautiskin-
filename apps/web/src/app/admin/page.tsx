@@ -4,7 +4,7 @@ import Link from 'next/link';
 import {
   Image, Package, ShoppingBag, Tag, ArrowRight, Flower2,
   FolderTree, Star, Users, DollarSign, Clock, Truck,
-  AlertTriangle, Loader2,
+  AlertTriangle, Loader2, BarChart3,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -38,6 +38,47 @@ function formatDate(d: string) {
   return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+// ── Revenue Chart ─────────────────────────────────────────────────────────────
+
+function RevenueChart({ data }: { data: { date: string; revenue: number; orders: number }[] }) {
+  const max = Math.max(...data.map((d) => d.revenue), 1);
+  const barW = 36;
+  const chartH = 180;
+  const gap = Math.max((100 - barW * data.length) / (data.length - 1), 8);
+
+  return (
+    <div className="rounded-2xl border border-blush-100 bg-white p-5 shadow-pink-sm">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-xl bg-primary-50 flex items-center justify-center">
+            <BarChart3 className="h-4 w-4 text-primary-500" />
+          </div>
+          <div>
+            <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Revenue — Last 7 Days</h2>
+            <p className="text-[11px] text-gray-400">Non-cancelled order totals per day</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-end justify-center gap-4" style={{ minHeight: chartH + 44 }}>
+        {data.map((d, i) => {
+          const h = Math.round((d.revenue / max) * chartH);
+          return (
+            <div key={i} className="flex flex-col items-center gap-1.5" title={`${d.date}: $${d.revenue.toFixed(2)} (${d.orders} orders)`}>
+              <span className="text-[10px] font-bold text-gray-500">{d.revenue > 0 ? `$${d.revenue.toFixed(0)}` : ''}</span>
+              <div className="relative flex items-end" style={{ width: barW, height: chartH }}>
+                <div className={`w-full rounded-t-xl transition-all duration-500 ${h === 0 ? 'bg-blush-100' : 'bg-gradient-to-t from-primary-500 to-primary-300'}`}
+                  style={{ height: Math.max(h, 4) }} />
+              </div>
+              <span className="text-[11px] font-semibold text-gray-400">{d.date}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard Page ───────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
@@ -66,7 +107,7 @@ export default function AdminDashboard() {
           <Loader2 className="h-6 w-6 text-primary-400 animate-spin" />
         </div>
       ) : stats && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <div className="rounded-2xl border border-blush-100 bg-white p-4 shadow-pink-sm">
             <div className="flex items-center gap-2 mb-2">
               <div className="h-8 w-8 rounded-xl bg-primary-50 flex items-center justify-center">
@@ -76,9 +117,14 @@ export default function AdminDashboard() {
             </div>
             <p className="text-xl font-extrabold text-gray-900">{formatMoney(stats.totalRevenue)}</p>
             <p className="text-[11px] text-gray-400 mt-0.5">Last 30 days: {formatMoney(stats.revenueLast30d)}</p>
+            {stats.revenueTrend?.length > 0 && (
+              <p className="text-[11px] text-emerald-600 font-semibold mt-0.5">
+                Today: {formatMoney(stats.revenueTrend[stats.revenueTrend.length - 1].revenue)}
+              </p>
+            )}
           </div>
 
-          <div className="rounded-2xl border border-blush-100 bg-white p-4 shadow-pink-sm">
+          <Link href="/admin/orders?status=PENDING" className="rounded-2xl border border-blush-100 bg-white p-4 shadow-pink-sm hover:shadow-pink-md transition-all block">
             <div className="flex items-center gap-2 mb-2">
               <div className="h-8 w-8 rounded-xl bg-amber-50 flex items-center justify-center">
                 <Clock className="h-4 w-4 text-amber-500" />
@@ -87,9 +133,9 @@ export default function AdminDashboard() {
             </div>
             <p className="text-xl font-extrabold text-amber-600">{stats.pendingOrders}</p>
             <p className="text-[11px] text-gray-400 mt-0.5">{stats.totalOrders} total orders</p>
-          </div>
+          </Link>
 
-          <div className="rounded-2xl border border-blush-100 bg-white p-4 shadow-pink-sm">
+          <Link href="/admin/customers" className="rounded-2xl border border-blush-100 bg-white p-4 shadow-pink-sm hover:shadow-pink-md transition-all block">
             <div className="flex items-center gap-2 mb-2">
               <div className="h-8 w-8 rounded-xl bg-violet-50 flex items-center justify-center">
                 <Users className="h-4 w-4 text-violet-500" />
@@ -98,9 +144,9 @@ export default function AdminDashboard() {
             </div>
             <p className="text-xl font-extrabold text-gray-900">{stats.totalCustomers}</p>
             <p className="text-[11px] text-gray-400 mt-0.5">+{stats.newCustomers30d} new this month</p>
-          </div>
+          </Link>
 
-          <div className="rounded-2xl border border-blush-100 bg-white p-4 shadow-pink-sm">
+          <Link href="/admin/products?low=1" className="rounded-2xl border border-blush-100 bg-white p-4 shadow-pink-sm hover:shadow-pink-md transition-all block">
             <div className="flex items-center gap-2 mb-2">
               <div className="h-8 w-8 rounded-xl bg-sky-50 flex items-center justify-center">
                 <Package className="h-4 w-4 text-sky-500" />
@@ -108,12 +154,21 @@ export default function AdminDashboard() {
               <span className="text-xs font-bold text-gray-500">Products</span>
             </div>
             <p className="text-xl font-extrabold text-gray-900">{stats.totalProducts}</p>
-            {stats.lowStockProducts > 0 && (
+            {stats.lowStockProducts > 0 ? (
               <p className="text-[11px] text-red-500 font-semibold mt-0.5 flex items-center gap-0.5">
-                <AlertTriangle className="h-3 w-3" /> {stats.lowStockProducts} low stock
+                <AlertTriangle className="h-3 w-3" /> {stats.lowStockProducts} low stock — view
               </p>
+            ) : (
+              <p className="text-[11px] text-gray-400 mt-0.5">All stock levels healthy</p>
             )}
-          </div>
+          </Link>
+        </div>
+      )}
+
+      {/* Revenue chart */}
+      {stats?.revenueTrend?.length > 0 && (
+        <div className="mb-6">
+          <RevenueChart data={stats.revenueTrend} />
         </div>
       )}
 

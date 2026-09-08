@@ -13,20 +13,45 @@ import {
 import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
 
-const NAV: { label: string; href: string; icon: any; badgeKey?: string }[] = [
-  { label: 'Dashboard',  href: '/admin',             icon: LayoutDashboard },
-  { label: 'Banners',    href: '/admin/banners',      icon: ImageIcon      },
-  { label: 'Categories', href: '/admin/categories',   icon: FolderTree     },
-  { label: 'Brands',     href: '/admin/brands',       icon: Star           },
-  { label: 'Products',   href: '/admin/products',     icon: Package        },
-  { label: 'Orders',     href: '/admin/orders',       icon: ShoppingBag    },
-  { label: 'Online Selling', href: '/admin/online-selling', icon: ShoppingCart },
-  { label: 'Coupons',    href: '/admin/coupons',      icon: Tag            },
-  { label: 'Customers',  href: '/admin/customers',    icon: Users          },
-  { label: 'Blog',       href: '/admin/blog',         icon: FileText       },
-  { label: 'Reviews',    href: '/admin/reviews',      icon: MessageSquare, badgeKey: 'reviews' },
-  { label: 'Messages',   href: '/admin/messages',     icon: Mail,          badgeKey: 'messages' },
-  { label: 'Subscribers',href: '/admin/subscribers',  icon: Send           },
+const NAV_GROUPS: { label: string; items: { label: string; href: string; icon: any; badgeKey?: string }[] }[] = [
+  {
+    label: 'Overview',
+    items: [
+      { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
+    ],
+  },
+  {
+    label: 'Sales',
+    items: [
+      { label: 'Orders', href: '/admin/orders', icon: ShoppingBag },
+      { label: 'Online Selling', href: '/admin/online-selling', icon: ShoppingCart },
+      { label: 'Coupons', href: '/admin/coupons', icon: Tag },
+    ],
+  },
+  {
+    label: 'Catalog',
+    items: [
+      { label: 'Products', href: '/admin/products', icon: Package },
+      { label: 'Categories', href: '/admin/categories', icon: FolderTree },
+      { label: 'Brands', href: '/admin/brands', icon: Star },
+    ],
+  },
+  {
+    label: 'Content',
+    items: [
+      { label: 'Banners', href: '/admin/banners', icon: ImageIcon },
+      { label: 'Blog', href: '/admin/blog', icon: FileText },
+    ],
+  },
+  {
+    label: 'Community',
+    items: [
+      { label: 'Customers', href: '/admin/customers', icon: Users },
+      { label: 'Reviews', href: '/admin/reviews', icon: MessageSquare, badgeKey: 'reviews' },
+      { label: 'Messages', href: '/admin/messages', icon: Mail, badgeKey: 'messages' },
+      { label: 'Subscribers', href: '/admin/subscribers', icon: Send },
+    ],
+  },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -106,34 +131,45 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
-          {NAV.map(({ label, href, icon: Icon, badgeKey }) => {
-            const isActive = href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
-            const count = badgeKey ? (badges[badgeKey] ?? 0) : 0;
-            return (
-              <Link key={href} href={href} onClick={() => setSidebarOpen(false)}
-                title={collapsed ? label : undefined}
-                className={`flex items-center gap-3 rounded-2xl font-semibold transition-all duration-150 group relative
-                            ${collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5 text-sm'}
-                            ${isActive ? 'bg-primary-500 text-white shadow-pink-sm' : 'text-gray-600 hover:bg-blush-100 hover:text-primary-600'}`}>
-                <Icon className="h-4.5 w-4.5 shrink-0" />
-                {!collapsed && (
-                  <>
-                    <span className="truncate">{label}</span>
-                    {count > 0 && (
-                      <span className="ml-auto inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1">
-                        {count > 99 ? '99+' : count}
-                      </span>
-                    )}
-                    {!count && isActive && <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-70" />}
-                  </>
-                )}
-                {collapsed && count > 0 && (
-                  <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white" />
-                )}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-4">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              {!collapsed && (
+                <p className="px-3 pb-1.5 text-[10px] font-extrabold tracking-widest text-gray-400 uppercase">
+                  {group.label}
+                </p>
+              )}
+              <div className="space-y-1">
+                {group.items.map(({ label, href, icon: Icon, badgeKey }) => {
+                  const isActive = href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
+                  const count = badgeKey ? (badges[badgeKey] ?? 0) : 0;
+                  return (
+                    <Link key={href} href={href} onClick={() => setSidebarOpen(false)}
+                      title={collapsed ? label : undefined}
+                      className={`flex items-center gap-3 rounded-2xl font-semibold transition-all duration-150 group relative
+                                  ${collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5 text-sm'}
+                                  ${isActive ? 'bg-primary-500 text-white shadow-pink-sm' : 'text-gray-600 hover:bg-blush-100 hover:text-primary-600'}`}>
+                      <Icon className="h-4.5 w-4.5 shrink-0" />
+                      {!collapsed && (
+                        <>
+                          <span className="truncate">{label}</span>
+                          {count > 0 && (
+                            <span className="ml-auto inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold min-w-[18px] h-[18px] px-1">
+                              {count > 99 ? '99+' : count}
+                            </span>
+                          )}
+                          {!count && isActive && <ChevronRight className="ml-auto h-3.5 w-3.5 opacity-70" />}
+                        </>
+                      )}
+                      {collapsed && count > 0 && (
+                        <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white" />
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* User + Logout */}
