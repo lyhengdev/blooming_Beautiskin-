@@ -124,6 +124,7 @@ async function main() {
     id: string;
     name: string;
     price: number;
+    costPrice: number;
     stock: number;
     category: string;
     description: string;
@@ -138,6 +139,7 @@ async function main() {
     const stock = parseInt(cols[3]) || 0;
     const category = cols[4]?.trim() || '';
     const description = cols[5]?.trim() || '';
+    const costPrice = parseFloat((cols[8] || '').replace(/[^0-9.]/g, '')) || 0;
 
     if (!id || !name) continue; // skip empty/blank rows
 
@@ -145,6 +147,7 @@ async function main() {
         id,
         name,
         price,
+        costPrice,
         stock,
         category: CATEGORY_NORMALIZE[category] ?? category,
         description,
@@ -229,6 +232,7 @@ async function main() {
           name: row.name,
           slug,
           price: row.price,
+          costPrice: row.costPrice || null,
           stock: row.stock,
           categoryId,
           brandId: defaultBrand.id,
@@ -239,6 +243,7 @@ async function main() {
           slug,
           sku: row.id,
           price: row.price,
+          costPrice: row.costPrice || null,
           stock: row.stock,
           trackStock: row.stock > 0,
           categoryId,

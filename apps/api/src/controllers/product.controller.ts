@@ -446,13 +446,12 @@ export async function getProductByIdAdmin(req: Request, res: Response) {
  */
 export async function createProduct(req: AuthRequest, res: Response) {
   const {
-    name, slug, description, shortDesc, price, comparePrice,
+    name, slug, description, shortDesc, price, comparePrice, costPrice,
     sku, stock, trackStock, weight, isActive, isFeatured,
     skinTypes, concerns, categoryId, brandId, images, variants,
   } = req.body;
 
   if (!name?.trim()) throw new AppError('name is required', 400);
-  if (!description?.trim()) throw new AppError('description is required', 400);
   if (!price) throw new AppError('price is required', 400);
   if (!sku?.trim()) throw new AppError('sku is required', 400);
   if (!categoryId) throw new AppError('categoryId is required', 400);
@@ -478,10 +477,11 @@ export async function createProduct(req: AuthRequest, res: Response) {
     data: {
       name: name.trim(),
       slug: finalSlug,
-      description: description.trim(),
+      description: description?.trim() || null,
       shortDesc: shortDesc?.trim() || null,
       price: parseFloat(price),
       comparePrice: comparePrice ? parseFloat(comparePrice) : null,
+      costPrice: costPrice ? parseFloat(costPrice) : null,
       sku: sku.trim(),
       stock: parseInt(stock as string) || 0,
       trackStock: trackStock ?? false,
@@ -526,7 +526,7 @@ export async function createProduct(req: AuthRequest, res: Response) {
 export async function updateProduct(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const {
-    name, slug, description, shortDesc, price, comparePrice,
+    name, slug, description, shortDesc, price, comparePrice, costPrice,
     sku, stock, trackStock, weight, isActive, isFeatured,
     skinTypes, concerns, categoryId, brandId, images, variants,
   } = req.body;
@@ -570,10 +570,11 @@ export async function updateProduct(req: AuthRequest, res: Response) {
   const data: Prisma.ProductUpdateInput = {};
   if (name !== undefined) data.name = name.trim();
   if (slug !== undefined || name !== undefined) data.slug = finalSlug;
-  if (description !== undefined) data.description = description.trim();
+  if (description !== undefined) data.description = description?.trim() || null;
   if (shortDesc !== undefined) data.shortDesc = shortDesc?.trim() || null;
   if (price !== undefined) data.price = parseFloat(price);
   if (comparePrice !== undefined) data.comparePrice = comparePrice ? parseFloat(comparePrice) : null;
+  if (costPrice !== undefined) data.costPrice = costPrice ? parseFloat(costPrice) : null;
   if (sku !== undefined) data.sku = sku.trim();
   if (stock !== undefined) data.stock = parseInt(stock as string);
   if (trackStock !== undefined) data.trackStock = trackStock;

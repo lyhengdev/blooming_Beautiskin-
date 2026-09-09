@@ -23,10 +23,11 @@ export interface Product {
   id: string;
   name: string;
   slug: string;
-  description: string;
+  description: string | null;
   shortDesc: string | null;
   price: number;
   comparePrice: number | null;
+  costPrice: number | null;
   sku: string;
   stock: number;
   isActive: boolean;

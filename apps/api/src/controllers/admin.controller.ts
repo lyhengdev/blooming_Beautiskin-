@@ -253,6 +253,145 @@ export async function getDashboardStats(_req: Request, res: Response) {
 // ── Customer Management ──────────────────────────────────────────────────────
 
 /**
+ * GET /api/admin/profit-stats
+ * Profit, margin, and cost analytics for the admin dashboard.
+ */
+export async function getProfitStats(_req: Request, res: Response) {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+  const [
+    allProducts,
+    ordersLast30d,
+    ordersAll,
+    productSales,
+  ] = await Promise.all([
+    prisma.product.findMany({
+      where: { isActive: true },
+      select: { id: true, price: true, costPrice: true, name: true, sku: true },
+    }),
+    prisma.orderItem.findMany({
+      where: {
+        order: {
+          status: { notIn: ['CANCELLED', 'REFUNDED'] },
+          createdAt: { gte: thirtyDaysAgo },
+        },
+      },
+      select: { productId: true, quantity: true, price: true },
+    }),
+    prisma.orderItem.findMany({
+      where: {
+        order: {
+          status: { notIn: ['CANCELLED', 'REFUNDED'] },
+        },
+      },
+      select: { productId: true, quantity: true, price: true },
+    }),
+    prisma.orderItem.groupBy({
+      by: ['productId'],
+      _sum: { quantity: true, price: true },
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: 20,
+    }),
+  ]);
+
+  const costMap = new Map(allProducts.map((p) => [p.id, p.costPrice ? Number(p.costPrice) : null]));
+
+  // All-time totals
+  let totalRevenue = 0;
+  let totalCost = 0;
+  let totalUnitsSold = 0;
+  let productsWithCost = 0;
+  let productsWithoutCost = 0;
+
+  for (const item of ordersAll) {
+    totalRevenue += Number(item.price) * item.quantity;
+    totalUnitsSold += item.quantity;
+    const cost = costMap.get(item.productId);
+    if (cost !== null && cost !== undefined) {
+      totalCost += cost * item.quantity;
+      productsWithCost += item.quantity;
+    } else {
+      productsWithoutCost += item.quantity;
+    }
+  }
+
+  const totalProfit = totalRevenue - totalCost;
+  const overallMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100) : 0;
+
+  // Last 30 days
+  let revenue30d = 0;
+  let cost30d = 0;
+  let unitsSold30d = 0;
+
+  for (const item of ordersLast30d) {
+    revenue30d += Number(item.price) * item.quantity;
+    unitsSold30d += item.quantity;
+    const cost = costMap.get(item.productId);
+    if (cost !== null && cost !== undefined) {
+      cost30d += cost * item.quantity;
+    }
+  }
+
+  const profit30d = revenue30d - cost30d;
+  const margin30d = revenue30d > 0 ? ((profit30d / revenue30d) * 100) : 0;
+
+  // Top selling products with margin info
+  const topProducts = productSales.map((sale) => {
+    const product = allProducts.find((p) => p.id === sale.productId);
+    const cost = costMap.get(sale.productId);
+    const revenue = Number(sale._sum.price ?? 0) * (sale._sum.quantity ?? 0);
+    const productCost = cost !== null && cost !== undefined
+      ? cost * (sale._sum.quantity ?? 0)
+      : null;
+    const profit = productCost !== null ? revenue - productCost : null;
+    const margin = revenue > 0 && profit !== null ? ((profit / revenue) * 100) : null;
+
+    return {
+      productId: sale.productId,
+      name: product?.name ?? 'Unknown',
+      sku: product?.sku ?? '',
+      unitsSold: sale._sum.quantity ?? 0,
+      revenue,
+      costPrice: cost,
+      totalCost: productCost,
+      profit,
+      margin,
+    };
+  });
+
+  // Per-product inventory value (stock * costPrice)
+  const inventoryValue = allProducts.reduce((sum, p) => {
+    return sum + (p.costPrice ? Number(p.costPrice) : 0);
+  }, 0);
+
+  res.json({
+    status: 'success',
+    data: {
+      allTime: {
+        revenue: totalRevenue,
+        cost: totalCost,
+        profit: totalProfit,
+        margin: Math.round(overallMargin * 100) / 100,
+        unitsSold: totalUnitsSold,
+        productsWithCost,
+        productsWithoutCost,
+      },
+      last30Days: {
+        revenue: revenue30d,
+        cost: cost30d,
+        profit: profit30d,
+        margin: Math.round(margin30d * 100) / 100,
+        unitsSold: unitsSold30d,
+      },
+      topProducts,
+      totalProductsWithCost: allProducts.filter((p) => p.costPrice !== null).length,
+      totalProducts: allProducts.length,
+    },
+  });
+}
+
+/**
  * GET /api/admin/customers
  * List all customers with search, pagination, and order counts.
  */

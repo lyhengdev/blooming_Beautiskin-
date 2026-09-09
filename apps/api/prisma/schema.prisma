@@ -61,10 +61,11 @@ model Product {
   id           String          @id @default(cuid())
   name         String
   slug         String          @unique
-  description  String          @db.Text
+  description  String?         @db.Text
   shortDesc    String?
   price        Decimal         @db.Decimal(10, 2)
   comparePrice Decimal?        @db.Decimal(10, 2)
+  costPrice    Decimal?        @db.Decimal(10, 2)
   sku          String          @unique
   stock        Int             @default(0)
   trackStock   Boolean         @default(false)

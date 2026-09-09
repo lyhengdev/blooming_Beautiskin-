@@ -17,7 +17,7 @@ interface Product {
   id: string;
   name: string;
   slug: string;
-  description: string;
+  description: string | null;
   shortDesc: string | null;
   price: string;
   comparePrice: string | null;
@@ -318,7 +318,11 @@ export default function ProductDetailPage() {
                 </div>
                 <div className="py-6">
                   {activeTab === 'description' && (
-                    <div className="text-sm text-gray-600 whitespace-pre-line">{product.description}</div>
+                    product.description ? (
+                      <div className="text-sm text-gray-600 whitespace-pre-line">{product.description}</div>
+                    ) : (
+                      <p className="text-sm text-gray-400">No description available for this product yet.</p>
+                    )
                   )}
                   {activeTab === 'ingredients' && (
                     <p className="text-sm text-gray-600">Full ingredient list will be available soon.</p>

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import {
   Image, Package, ShoppingBag, Tag, ArrowRight, Flower2,
   FolderTree, Star, Users, DollarSign, Clock, Truck,
-  AlertTriangle, Loader2, BarChart3,
+  AlertTriangle, Loader2, BarChart3, PiggyBank, TrendingUp, Percent,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
@@ -87,7 +87,20 @@ export default function AdminDashboard() {
     queryFn: () => api.get('/admin/stats'),
   });
 
+  const { data: profitRes } = useQuery({
+    queryKey: ['adminProfitStats'],
+    queryFn: () => api.get('/admin/profit-stats'),
+  });
+
   const stats = statsRes?.data?.data;
+  const profit = profitRes?.data?.data;
+
+  const marginColor = (m: number | null | undefined) => {
+    if (m === null || m === undefined) return 'text-gray-400';
+    if (m >= 50) return 'text-emerald-600';
+    if (m >= 25) return 'text-amber-600';
+    return 'text-red-500';
+  };
 
   return (
     <div>
@@ -169,6 +182,102 @@ export default function AdminDashboard() {
       {stats?.revenueTrend?.length > 0 && (
         <div className="mb-6">
           <RevenueChart data={stats.revenueTrend} />
+        </div>
+      )}
+
+      {/* Profit & Margin Analytics */}
+      {profit && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="h-8 w-8 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <PiggyBank className="h-4 w-4 text-emerald-500" />
+            </div>
+            <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Profit & Margin</h2>
+            <span className="text-[11px] text-gray-400">Based on cost price (import) vs selling price</span>
+          </div>
+
+          {/* All-time profit stat cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+            <div className="rounded-2xl border border-blush-100 bg-white p-4 shadow-pink-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <PiggyBank className="h-4 w-4 text-emerald-500" />
+                </div>
+                <span className="text-xs font-bold text-gray-500">All-Time Profit</span>
+              </div>
+              <p className="text-xl font-extrabold text-emerald-600">{formatMoney(profit.allTime.profit)}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{formatMoney(profit.allTime.revenue)} revenue</p>
+            </div>
+
+            <div className="rounded-2xl border border-blush-100 bg-white p-4 shadow-pink-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded-xl bg-teal-50 flex items-center justify-center">
+                  <Percent className="h-4 w-4 text-teal-500" />
+                </div>
+                <span className="text-xs font-bold text-gray-500">Overall Margin</span>
+              </div>
+              <p className={`text-xl font-extrabold ${marginColor(profit.allTime.margin)}`}>{profit.allTime.margin}%</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{formatMoney(profit.allTime.cost)} total cost</p>
+            </div>
+
+            <div className="rounded-2xl border border-blush-100 bg-white p-4 shadow-pink-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded-xl bg-indigo-50 flex items-center justify-center">
+                  <TrendingUp className="h-4 w-4 text-indigo-500" />
+                </div>
+                <span className="text-xs font-bold text-gray-500">Last 30 Days Profit</span>
+              </div>
+              <p className="text-xl font-extrabold text-indigo-600">{formatMoney(profit.last30Days.profit)}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{formatMoney(profit.last30Days.revenue)} revenue · {profit.last30Days.unitsSold} units</p>
+            </div>
+
+            <div className="rounded-2xl border border-blush-100 bg-white p-4 shadow-pink-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-8 w-8 rounded-xl bg-rose-50 flex items-center justify-center">
+                  <Percent className="h-4 w-4 text-rose-500" />
+                </div>
+                <span className="text-xs font-bold text-gray-500">30-Day Margin</span>
+              </div>
+              <p className={`text-xl font-extrabold ${marginColor(profit.last30Days.margin)}`}>{profit.last30Days.margin}%</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                {profit.totalProductsWithCost} of {profit.totalProducts} products have cost price set
+              </p>
+            </div>
+          </div>
+
+          {/* Top products by units sold with margin */}
+          {profit.topProducts?.length > 0 && (
+            <div className="rounded-2xl border border-blush-100 bg-white p-5 shadow-pink-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xs font-bold text-gray-700 uppercase tracking-wider">Top Sellers — Margin Breakdown</h2>
+                <Link href="/admin/products" className="text-xs font-bold text-primary-500 hover:text-primary-700 flex items-center gap-0.5">
+                  View products <ArrowRight className="h-3 w-3" />
+                </Link>
+              </div>
+              <div className="space-y-2">
+                {profit.topProducts.slice(0, 8).map((tp: any) => (
+                  <div key={tp.productId} className="flex items-center justify-between rounded-xl bg-blush-50/50 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-gray-900 truncate">{tp.name}</p>
+                      <p className="text-[11px] text-gray-400">{tp.unitsSold} sold · ${tp.revenue.toFixed(2)} revenue</p>
+                    </div>
+                    <div className="text-right shrink-0 ml-3">
+                      {tp.profit !== null ? (
+                        <>
+                          <p className="text-sm font-bold text-gray-900">${tp.profit.toFixed(2)} profit</p>
+                          <p className={`text-[11px] font-bold ${marginColor(tp.margin)}`}>
+                            {tp.margin?.toFixed(0)}% margin · cost {tp.costPrice ? `$${tp.costPrice.toFixed(2)}` : 'N/A'}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-[11px] font-semibold text-amber-600">No cost price set</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

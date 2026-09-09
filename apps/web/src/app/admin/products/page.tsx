@@ -37,6 +37,7 @@ interface ProductListItem {
   sku: string;
   price: string;
   comparePrice: string | null;
+  costPrice: string | null;
   stock: number;
   trackStock: boolean;
   isActive: boolean;
@@ -110,6 +111,7 @@ function ProductFormModal({
   const [shortDesc, setShortDesc] = useState(initial?.shortDesc ?? '');
   const [price, setPrice] = useState(initial?.price?.toString() ?? '');
   const [comparePrice, setComparePrice] = useState(initial?.comparePrice?.toString() ?? '');
+  const [costPrice, setCostPrice] = useState(initial?.costPrice?.toString() ?? '');
   const [stock, setStock] = useState(initial?.stock?.toString() ?? '0');
   const [trackStock, setTrackStock] = useState(initial?.trackStock ?? false);
   const [weight, setWeight] = useState(initial?.weight?.toString() ?? '');
@@ -211,12 +213,11 @@ function ProductFormModal({
     if (!price || parseFloat(price) < 0) { setError('Valid price is required'); return; }
     if (!categoryId) { setError('Category is required'); return; }
     if (!brandId) { setError('Brand is required'); return; }
-    if (!description.trim()) { setError('Description is required'); return; }
     setError('');
 
     saveMutation.mutate({
       name, slug: slug || slugify(name), sku: sku.trim(), description, shortDesc: shortDesc || null,
-      price, comparePrice: comparePrice || null, stock, trackStock, weight: weight || null,
+      price, comparePrice: comparePrice || null, costPrice: costPrice || null, stock, trackStock, weight: weight || null,
       isActive, isFeatured, categoryId, brandId, skinTypes, concerns,
       images: images.map((img, i) => ({ url: img.url, alt: img.alt || '', sortOrder: i })),
       variants: variants.filter((v) => v.name.trim()).map((v) => ({
@@ -271,7 +272,7 @@ function ProductFormModal({
                 <input value={shortDesc} onChange={(e) => setShortDesc(e.target.value)} className="input-field w-full" placeholder="Brief summary..." />
               </div>
               <div>
-                <label className="block text-xs font-bold text-gray-600 mb-1">Full Description <span className="text-red-400">*</span></label>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Full Description</label>
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="input-field w-full resize-none" placeholder="Detailed product description..." />
               </div>
             </div>
@@ -280,7 +281,7 @@ function ProductFormModal({
           {/* Pricing & Inventory */}
           <section>
             <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Pricing & Inventory</h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Price ($) <span className="text-red-400">*</span></label>
                 <input type="number" step="0.01" min="0" value={price} onChange={(e) => setPrice(e.target.value)} className="input-field w-full" placeholder="0.00" />
@@ -288,6 +289,10 @@ function ProductFormModal({
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Compare Price ($)</label>
                 <input type="number" step="0.01" min="0" value={comparePrice} onChange={(e) => setComparePrice(e.target.value)} className="input-field w-full" placeholder="Optional" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Cost Price ($) <span className="text-primary-400">(import)</span></label>
+                <input type="number" step="0.01" min="0" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} className="input-field w-full" placeholder="Optional" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Stock</label>
@@ -575,6 +580,8 @@ function ProductListView({
               <th className="px-4 py-3 font-bold">Category</th>
               <th className="px-4 py-3 font-bold">Brand</th>
               <th className="px-4 py-3 font-bold">Price</th>
+              <th className="px-4 py-3 font-bold">Cost</th>
+              <th className="px-4 py-3 font-bold">Margin</th>
               <th className="px-4 py-3 font-bold">Stock</th>
               <th className="px-4 py-3 font-bold">Status</th>
               <th className="px-4 py-3 font-bold text-right">Actions</th>
@@ -605,6 +612,21 @@ function ProductListView({
                   {p.comparePrice && (
                     <span className="ml-1.5 text-[11px] font-normal text-gray-400 line-through">${parseFloat(p.comparePrice).toFixed(2)}</span>
                   )}
+                </td>
+                <td className="px-4 py-3 font-semibold text-gray-700">
+                  {p.costPrice ? <><span className="text-gray-400">${parseFloat(p.costPrice).toFixed(2)}</span></> : <span className="text-gray-300">—</span>}
+                </td>
+                <td className="px-4 py-3">
+                  {p.costPrice ? (
+                    (() => {
+                      const m = parseFloat(p.price) > 0 ? ((parseFloat(p.price) - parseFloat(p.costPrice)) / parseFloat(p.price)) * 100 : 0;
+                      return (
+                        <span className={`font-bold ${m >= 50 ? 'text-emerald-600' : m >= 25 ? 'text-amber-600' : 'text-red-500'}`}>
+                          {m.toFixed(0)}%
+                        </span>
+                      );
+                    })()
+                  ) : <span className="text-gray-300">—</span>}
                 </td>
                 <td className={`px-4 py-3 font-semibold ${p.trackStock ? (p.stock <= 5 ? 'text-red-500' : 'text-gray-600') : 'text-gray-400'}`}>
                   <div className="flex items-center gap-1.5">
@@ -744,11 +766,13 @@ export default function AdminProductsPage() {
       } while (p <= totalPages);
 
       downloadCSV('products.csv', [
-        ['SKU', 'Name', 'Category', 'Brand', 'Price', 'Compare Price', 'Stock', 'Track Stock', 'Status', 'Featured', 'Reviews'],
+        ['SKU', 'Name', 'Category', 'Brand', 'Price', 'Compare Price', 'Cost Price', 'Margin %', 'Stock', 'Track Stock', 'Status', 'Featured', 'Reviews'],
         ...all.map((pr) => [
           pr.sku, pr.name, pr.category.name, pr.brand.name,
           parseFloat(pr.price).toFixed(2),
           pr.comparePrice ? parseFloat(pr.comparePrice).toFixed(2) : '',
+          pr.costPrice ? parseFloat(pr.costPrice).toFixed(2) : '',
+          pr.costPrice && parseFloat(pr.price) > 0 ? (((parseFloat(pr.price) - parseFloat(pr.costPrice)) / parseFloat(pr.price)) * 100).toFixed(1) : '',
           pr.stock, pr.trackStock ? 'Yes' : 'No', pr.isActive ? 'Active' : 'Inactive',
           pr.isFeatured ? 'Yes' : 'No', pr._count.reviews,
         ]),
@@ -882,6 +906,11 @@ export default function AdminProductsPage() {
                     <div className="text-right shrink-0">
                       <p className="text-sm font-extrabold text-gray-900">${parseFloat(p.price).toFixed(2)}</p>
                       {p.comparePrice && <p className="text-[11px] text-gray-400 line-through">${parseFloat(p.comparePrice).toFixed(2)}</p>}
+                      {p.costPrice && (
+                        <p className={`text-[11px] font-bold ${(parseFloat(p.price) - parseFloat(p.costPrice)) / parseFloat(p.price) >= 0.25 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                          Cost ${parseFloat(p.costPrice).toFixed(2)} · {Math.round(((parseFloat(p.price) - parseFloat(p.costPrice)) / parseFloat(p.price)) * 100)}% margin
+                        </p>
+                      )}
                     </div>
                   </div>
 

@@ -12,6 +12,7 @@ router.use(authenticate, authorize('ADMIN', 'SUPER_ADMIN'));
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 router.get('/stats', asyncHandler(adminController.getDashboardStats));
+router.get('/profit-stats', asyncHandler(adminController.getProfitStats));
 
 // ── Customers ────────────────────────────────────────────────────────────────
 router.get('/customers', asyncHandler(adminController.getAllCustomers));
