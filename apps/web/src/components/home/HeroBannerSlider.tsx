@@ -23,6 +23,7 @@ export default function HeroBannerSlider() {
   const [paused, setPaused] = useState(false);
   const [tick, setTick]     = useState(0);
   const timerRef            = useRef<ReturnType<typeof setInterval>>();
+  const touchStartX         = useRef<number | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['banners'],
@@ -69,6 +70,17 @@ export default function HeroBannerSlider() {
       className="relative w-full h-[300px] sm:h-[420px] lg:h-[520px] overflow-hidden group"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
+      onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+      onTouchMove={() => setPaused(true)}
+      onTouchEnd={(e) => {
+        if (touchStartX.current === null) return;
+        const delta = e.changedTouches[0].clientX - touchStartX.current;
+        touchStartX.current = null;
+        if (total <= 1) return;
+        const threshold = 48;
+        if (delta < -threshold) next();
+        else if (delta > threshold) prev();
+      }}
     >
       {/* ── Slides ───────────────────────────────────────────────────── */}
       <div
@@ -146,13 +158,6 @@ export default function HeroBannerSlider() {
           />
         </div>
       )}
-
-      <style>{`
-        @keyframes bannerProgress {
-          from { width: 0% }
-          to   { width: 100% }
-        }
-      `}</style>
     </div>
   );
 }

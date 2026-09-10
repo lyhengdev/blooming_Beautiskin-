@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Heart, ShoppingBag, Star, Minus, Plus, ChevronRight, Package, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
@@ -60,11 +60,11 @@ export default function ProductDetailPage() {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [activeTab, setActiveTab] = useState<'description' | 'ingredients' | 'reviews'>('description');
+  const [activeTab, setActiveTab] = useState<'description' | 'reviews'>('description');
   const [addingToCart, setAddingToCart] = useState(false);
-  const [addedMsg, setAddedMsg] = useState(false);
   const [buyingNow, setBuyingNow] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  const touchStartX = useRef<number | null>(null);
   const addToCart = useCartStore((s) => s.addToCart);
 
   useEffect(() => {
@@ -111,8 +111,7 @@ export default function ProductDetailPage() {
     setAddingToCart(true);
     try {
       await addToCart(product.id, quantity);
-      setAddedMsg(true);
-      setTimeout(() => setAddedMsg(false), 2000);
+      toast.success('Added to cart');
     } catch (err) {
       toast.error('Failed to add to cart');
     } finally {
@@ -218,7 +217,18 @@ export default function ProductDetailPage() {
         <div className="container-shop pb-16">
           <div className="grid lg:grid-cols-2 gap-10">
             <div>
-              <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center">
+              <div className="relative aspect-square bg-gray-100 rounded-xl overflow-hidden flex items-center justify-center"
+                onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX; }}
+                onTouchEnd={(e) => {
+                  if (touchStartX.current === null) return;
+                  const delta = e.changedTouches[0].clientX - touchStartX.current;
+                  touchStartX.current = null;
+                  const threshold = 48;
+                  if (Math.abs(delta) < threshold) return;
+                  const length = product.images.length;
+                  if (delta < 0 && selectedImage < length - 1) setSelectedImage(selectedImage + 1);
+                  if (delta > 0 && selectedImage > 0) setSelectedImage(selectedImage - 1);
+                }}>
                 {product.images.length > 0 ? (
                   <Image src={product.images[selectedImage]?.url || product.images[0].url}
                     alt={product.name} fill className="object-cover" unoptimized />
@@ -287,10 +297,8 @@ export default function ProductDetailPage() {
                 </div>
                 <button onClick={handleAddToCart} disabled={(product.trackStock && product.stock === 0) || addingToCart || buyingNow}
                   className="flex-1 btn-primary py-3 flex items-center justify-center gap-2 disabled:opacity-50">
-                  {addedMsg ? (
-                    <>Added!</>
-                  ) : addingToCart ? (
-                    <>Adding...</>
+                  {addingToCart ? (
+                    <><ShoppingBag className="h-5 w-5" /> Adding...</>
                   ) : (
                     <><ShoppingBag className="h-5 w-5" /> Add to Cart</>
                   )}
@@ -309,10 +317,15 @@ export default function ProductDetailPage() {
 
               <div className="mt-8 border-t pt-6">
                 <div className="flex gap-4 sm:gap-6 border-b overflow-x-auto scrollbar-hide">
-                  {(['description', 'ingredients', 'reviews'] as const).map((tab) => (
-                    <button key={tab} onClick={() => setActiveTab(tab)}
-                      className={`pb-3 text-sm font-medium capitalize transition-colors ${activeTab === tab ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-700'}`}>
-                      {tab} {tab === 'reviews' && `(${product.reviewCount})`}
+                  {(
+                    [
+                      { key: 'description', label: 'Description' },
+                      { key: 'reviews', label: `Reviews (${product.reviewCount})` },
+                    ] as const
+                  ).map((tab) => (
+                    <button key={tab.key} onClick={() => setActiveTab(tab.key === 'reviews' ? 'reviews' : 'description')}
+                      className={`pb-3 text-sm font-medium capitalize transition-colors ${activeTab === tab.key ? 'text-primary-600 border-b-2 border-primary-600' : 'text-gray-500 hover:text-gray-700'}`}>
+                      {tab.label}
                     </button>
                   ))}
                 </div>
@@ -323,9 +336,6 @@ export default function ProductDetailPage() {
                     ) : (
                       <p className="text-sm text-gray-400">No description available for this product yet.</p>
                     )
-                  )}
-                  {activeTab === 'ingredients' && (
-                    <p className="text-sm text-gray-600">Full ingredient list will be available soon.</p>
                   )}
                   {activeTab === 'reviews' && (
                     <div className="space-y-6">
@@ -472,7 +482,7 @@ export default function ProductDetailPage() {
           <button onClick={handleAddToCart}
             disabled={(product.trackStock && product.stock === 0) || addingToCart || buyingNow}
             className="flex-1 btn-primary py-3 flex items-center justify-center gap-2 text-sm disabled:opacity-50">
-            {addedMsg ? <><ShoppingBag className="h-4 w-4" /> Added!</> : addingToCart ? <><ShoppingBag className="h-4 w-4" /> Adding...</> : <><ShoppingBag className="h-4 w-4" /> Add to Cart</>}
+            {addingToCart ? <><ShoppingBag className="h-4 w-4" /> Adding...</> : <><ShoppingBag className="h-4 w-4" /> Add to Cart</>}
           </button>
           <button onClick={handleBuyNow}
             disabled={(product.trackStock && product.stock === 0) || buyingNow || addingToCart}

@@ -1,5 +1,6 @@
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import Link from 'next/link';
 import { Flower2, ShieldCheck, Microscope, MapPin } from 'lucide-react';
 
 export default function AboutPage() {
@@ -36,8 +37,11 @@ export default function AboutPage() {
                   Beauty of Joseon Glow Serum, we bring the best of K-beauty and J-beauty to your doorstep.
                 </p>
               </div>
-              <div className="aspect-square bg-gradient-to-br from-primary-100 to-primary-200 rounded-2xl flex items-center justify-center">
-                <Flower2 className="h-32 w-32 text-primary-400" />
+              <div className="aspect-square bg-gradient-to-br from-primary-100 to-primary-200 rounded-2xl flex flex-col items-center justify-center text-center p-8">
+                <Flower2 className="h-20 w-20 text-primary-400" />
+                <p className="mt-6 font-heading font-bold text-primary-700 text-lg">
+                  Bringing the best of K-beauty &amp; J-beauty to Cambodia
+                </p>
               </div>
             </div>
           </div>
@@ -84,7 +88,7 @@ export default function AboutPage() {
               Start Your Skincare Journey
             </h2>
             <p className="mt-3 text-gray-600">Browse our curated collection of skincare products</p>
-            <a href="/shop" className="mt-6 inline-block btn-primary">Shop Now</a>
+            <Link href="/shop" className="mt-6 inline-block btn-primary">Shop Now</Link>
           </div>
         </section>
       </main>

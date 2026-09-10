@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Flower2, Package, Gift, Truck, Phone, Heart } from 'lucide-react';
+import BackToTop from '@/components/layout/BackToTop';
 
 const shopLinks = [
   { name: 'All Products', href: '/shop' },
@@ -139,6 +140,8 @@ export default function Footer() {
         </div>
 
       </div>
+
+      <BackToTop />
     </footer>
   );
 }

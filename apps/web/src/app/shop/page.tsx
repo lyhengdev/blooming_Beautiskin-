@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { SlidersHorizontal, X, Grid3X3, LayoutList, Package, ChevronLeft, ChevronRight } from 'lucide-react';
+import { SlidersHorizontal, X, Grid3X3, LayoutList, Package, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import api from '@/lib/api';
@@ -40,6 +40,7 @@ interface Brand {
 
 function ShopContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -48,10 +49,11 @@ function ShopContent() {
   const brandParam = searchParams.get('brand') || '';
   const skinTypeParam = searchParams.get('skinType') || '';
   const searchQuery = searchParams.get('search') || '';
+  const sortParam = searchParams.get('sort') || 'popular';
 
   const { data: productsData, isLoading: loading } = useQuery({
-    queryKey: ['products', { category: categoryParam, brand: brandParam, skinType: skinTypeParam, search: searchQuery, page: currentPage }],
-    queryFn: () => api.get('/products', { params: { category: categoryParam, brand: brandParam, skinType: skinTypeParam, search: searchQuery, page: currentPage, limit: 12 } }),
+    queryKey: ['products', { category: categoryParam, brand: brandParam, skinType: skinTypeParam, search: searchQuery, sort: sortParam, page: currentPage }],
+    queryFn: () => api.get('/products', { params: { category: categoryParam, brand: brandParam, skinType: skinTypeParam, search: searchQuery, sort: sortParam, page: currentPage, limit: 12 } }),
   });
 
   const { data: categoriesData } = useQuery({
@@ -66,10 +68,26 @@ function ShopContent() {
 
   const products: Product[] = productsData?.data.data.products ?? [];
   const totalPages: number = productsData?.data.data.pagination.totalPages ?? 1;
+  const totalProducts: number = productsData?.data.data.pagination.total ?? products.length;
   const categories: Category[] = categoriesData?.data.data.categories ?? [];
   const brands: Brand[] = brandsData?.data.data.brands ?? [];
 
   const activeFilters = [categoryParam, brandParam, skinTypeParam].filter(Boolean);
+
+  const SORT_OPTIONS = [
+    { value: 'popular', label: 'Most Popular' },
+    { value: 'newest', label: 'Newest' },
+    { value: 'price_asc', label: 'Price: Low to High' },
+    { value: 'price_desc', label: 'Price: High to Low' },
+  ];
+
+  const setSort = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value === 'popular' || value === '') params.delete('sort');
+    else params.set('sort', value);
+    router.push(`/shop?${params.toString()}`);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -82,7 +100,7 @@ function ShopContent() {
               {searchQuery ? `Search: "${searchQuery}"` : categoryParam ? `${categoryParam} Products` : 'All Products'}
             </h1>
             <p className="mt-2 text-gray-500">
-              {loading ? 'Loading...' : `${products.length} products found`}
+              {loading ? 'Loading...' : `${totalProducts} product${totalProducts !== 1 ? 's' : ''} found`}
             </p>
           </div>
         </div>
@@ -92,6 +110,14 @@ function ShopContent() {
             {/* Sidebar Filters - Desktop */}
             <aside className="hidden lg:block">
               <div className="sticky top-24 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900 text-sm uppercase tracking-wide">Filters</h3>
+                  {activeFilters.length > 0 && (
+                    <Link href="/shop" className="text-xs font-semibold text-primary-600 hover:text-primary-700 hover:underline">
+                      Clear all
+                    </Link>
+                  )}
+                </div>
                 <div>
                   <h3 className="font-semibold text-gray-900 mb-3">Categories</h3>
                   <div className="space-y-2">
@@ -160,6 +186,19 @@ function ShopContent() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                    <select
+                      value={sortParam}
+                      onChange={(e) => setSort(e.target.value)}
+                      aria-label="Sort products"
+                      className="pl-9 pr-8 py-2 rounded-lg border border-blush-200 text-sm font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 cursor-pointer"
+                    >
+                      {SORT_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </div>
                   <button onClick={() => setViewMode('grid')}
                     className={`p-2 rounded min-w-[44px] min-h-[44px] flex items-center justify-center ${viewMode === 'grid' ? 'bg-gray-100' : ''}`}>
                     <Grid3X3 className="h-4 w-4" />
@@ -276,7 +315,7 @@ function ShopContent() {
       {showFilters && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowFilters(false)} />
-          <div className="absolute right-0 top-0 bottom-0 w-full max-w-80 bg-white shadow-xl p-6 overflow-y-auto">
+          <div className="absolute right-0 top-0 bottom-0 w-full max-w-80 bg-white shadow-xl p-6 overflow-y-auto animate-slide-right">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-semibold">Filters</h2>
               <button onClick={() => setShowFilters(false)}><X className="h-5 w-5" /></button>

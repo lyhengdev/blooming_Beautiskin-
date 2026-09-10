@@ -122,9 +122,9 @@ export default function CartPage() {
                       </div>
                       <div className="flex items-center justify-between mt-2 sm:mt-3">
                         <div className="flex items-center border rounded-lg">
-                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)} className="p-2 sm:p-2.5 hover:bg-gray-50 rounded-l-lg"><Minus className="h-3 w-3" /></button>
+                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)} className="flex items-center justify-center p-2.5 sm:p-3 hover:bg-gray-50 rounded-l-lg min-w-[40px] min-h-[40px]" aria-label="Decrease quantity"><Minus className="h-4 w-4" /></button>
                           <span className="px-2.5 sm:px-3 text-sm font-medium min-w-[32px] text-center">{item.quantity}</span>
-                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)} className="p-2 sm:p-2.5 hover:bg-gray-50 rounded-r-lg"><Plus className="h-3 w-3" /></button>
+                          <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)} className="flex items-center justify-center p-2.5 sm:p-3 hover:bg-gray-50 rounded-r-lg min-w-[40px] min-h-[40px]" aria-label="Increase quantity"><Plus className="h-4 w-4" /></button>
                         </div>
                         <p className="font-bold text-sm sm:text-base text-primary-600">${(parseFloat(item.product.price) * item.quantity).toFixed(2)}</p>
                       </div>
@@ -165,10 +165,10 @@ export default function CartPage() {
                 </div>
 
                 {subtotal < 30 && subtotal > 0 && (
-                  <div className="mt-4 p-3 bg-primary-50 rounded-lg">
-                    <p className="text-xs text-primary-700">Add ${(30 - subtotal).toFixed(2)} more for free shipping!</p>
-                    <div className="mt-2 bg-primary-200 rounded-full h-2">
-                      <div className="bg-primary-600 h-2 rounded-full transition-all" style={{ width: `${Math.min(100, (subtotal / 30) * 100)}%` }} />
+                  <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                    <p className="text-xs text-green-700">Add ${(30 - subtotal).toFixed(2)} more for free shipping!</p>
+                    <div className="mt-2 bg-green-100 rounded-full h-2">
+                      <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${Math.min(100, (subtotal / 30) * 100)}%` }} />
                     </div>
                   </div>
                 )}

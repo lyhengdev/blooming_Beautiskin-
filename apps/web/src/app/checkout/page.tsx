@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Check, Package, LogIn } from 'lucide-react';
+import { Check, Package, LogIn, X, Banknote, Wallet, CreditCard, Landmark } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -29,6 +29,7 @@ export default function CheckoutPage() {
   const { user } = useAuthStore();
   const { items, subtotal, itemCount, fetchCart, clearCart } = useCartStore();
   const [step, setStep] = useState(1);
+  const [showLoginBanner, setShowLoginBanner] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('CASH_ON_DELIVERY');
   const [formData, setFormData] = useState({
@@ -111,16 +112,26 @@ export default function CheckoutPage() {
         <div className="container-shop py-6 sm:py-8">
           <h1 className="text-2xl sm:text-3xl font-heading font-bold text-gray-900 mb-6 sm:mb-8">Checkout</h1>
 
-          {!user && (
+          {!user && showLoginBanner && (
             <div className="mb-6 sm:mb-8 p-3 sm:p-4 bg-primary-50 rounded-xl border border-primary-100">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
                   <p className="font-medium text-gray-900">You need to log in to checkout</p>
                   <p className="text-sm text-gray-600">Login for faster checkout and order tracking.</p>
                 </div>
-                <Link href="/login?returnTo=/checkout" className="btn-primary text-sm flex items-center gap-1">
-                  <LogIn className="h-4 w-4" /> Login
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link href="/login?returnTo=/checkout" className="btn-primary text-sm flex items-center gap-1">
+                    <LogIn className="h-4 w-4" /> Login
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginBanner(false)}
+                    className="p-2 rounded-full hover:bg-primary-100 transition-colors text-primary-600"
+                    aria-label="Dismiss login prompt"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -214,10 +225,10 @@ export default function CheckoutPage() {
                         <p className="font-medium mb-2">Payment Method</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {[
-                            { value: 'CASH_ON_DELIVERY', label: 'Cash on Delivery' },
-                            { value: 'ABA_PAY', label: 'ABA Pay' },
-                            { value: 'WING', label: 'Wing Money' },
-                            { value: 'CREDIT_CARD', label: 'Credit / Debit Card' },
+                            { value: 'CASH_ON_DELIVERY', label: 'Cash on Delivery', icon: Banknote },
+                            { value: 'ABA_PAY', label: 'ABA Pay', icon: Landmark },
+                            { value: 'WING', label: 'Wing Money', icon: Wallet },
+                            { value: 'CREDIT_CARD', label: 'Credit / Debit Card', icon: CreditCard },
                           ].map((opt) => (
                             <button
                               key={opt.value}
@@ -234,6 +245,7 @@ export default function CheckoutPage() {
                               }`}>
                                 {paymentMethod === opt.value && <span className="h-1.5 w-1.5 rounded-full bg-primary-600" />}
                               </span>
+                              <opt.icon className="h-4 w-4 text-primary-500 shrink-0" />
                               {opt.label}
                             </button>
                           ))}

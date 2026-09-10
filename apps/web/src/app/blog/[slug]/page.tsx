@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Calendar, User, Tag } from 'lucide-react';
+import { Calendar, User, Tag, ChevronRight, ArrowLeft } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -73,9 +73,13 @@ export default function BlogPostPage() {
       <main className="flex-1">
         <div className="bg-gradient-to-br from-primary-50 to-pink-50 py-12">
           <div className="max-w-3xl mx-auto px-4">
-            <Link href="/blog" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-primary-600 mb-6">
-              <ArrowLeft className="h-4 w-4" /> Back to Blog
-            </Link>
+            <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-6 flex-wrap">
+              <Link href="/" className="hover:text-primary-500 transition-colors">Home</Link>
+              <ChevronRight className="h-3 w-3" />
+              <Link href="/blog" className="hover:text-primary-500 transition-colors">Blog</Link>
+              <ChevronRight className="h-3 w-3" />
+              <span className="text-gray-700 font-semibold truncate max-w-[60vw]">{post.title}</span>
+            </nav>
             <div className="flex flex-wrap gap-2 mb-3">
               {post.tags.map((tag) => (
                 <span key={tag} className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-full">{tag}</span>

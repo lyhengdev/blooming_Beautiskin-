@@ -103,12 +103,15 @@ function badgeIcon(name: string): LucideIcon {
 function ProductCard({ product }: { product: Product }) {
   return (
     <Link href={`/product/${product.slug}`} className="card group block">
-      <div className="aspect-square bg-blush-50 flex items-center justify-center overflow-hidden rounded-t-3xl">
+      <div className="relative aspect-square bg-blush-50 flex items-center justify-center overflow-hidden rounded-t-3xl">
         {product.images.length > 0 ? (
-          <img
+          <Image
             src={product.images[0].url}
             alt={product.images[0].alt || product.name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            fill
+            sizes="(max-width: 640px) 50vw, 25vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            unoptimized
           />
         ) : (
           <Package className="h-10 w-10 text-primary-200 opacity-60" />
@@ -325,12 +328,14 @@ export default function HomePage() {
                                    bg-white p-4 text-center shadow-pink-sm shrink-0 w-28 md:w-auto
                                    transition-all duration-200 hover:-translate-y-1 hover:border-primary-200 hover:shadow-pink-md"
                       >
-                        <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${colors.bg}`}>
+                        <div className={`relative flex h-12 w-12 items-center justify-center rounded-2xl ${colors.bg}`}>
                           {cat.image ? (
-                            <img
+                            <Image
                               src={cat.image}
                               alt={cat.name}
-                              className="h-full w-full rounded-2xl object-cover"
+                              fill
+                              className="rounded-2xl object-cover"
+                              unoptimized
                             />
                           ) : (
                             <Icon className={`h-6 w-6 ${colors.ic}`} />

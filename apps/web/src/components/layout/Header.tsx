@@ -23,6 +23,8 @@ const navItems = [
   { name: 'Brands', href: '/brands' },
 ];
 
+const ANNOUNCEMENT_KEY = 'bbs_announcement_dismissed';
+
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
@@ -30,9 +32,16 @@ export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [announcementVisible, setAnnouncementVisible] = useState(true);
   const searchRef = useRef<HTMLInputElement>(null);
   const { user, logout } = useAuthStore();
   const { itemCount, fetchCart, resetCart } = useCartStore();
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(ANNOUNCEMENT_KEY)) setAnnouncementVisible(false);
+    } catch { /* storage unavailable */ }
+  }, []);
 
   useEffect(() => { fetchCart(); }, [fetchCart]);
 
@@ -60,25 +69,32 @@ export default function Header() {
     }
   };
 
-  // Active category from URL
+  // Active category from URL — resolved client-side inside the effect so
+  // it never runs during SSR (avoids hydration mismatches), and re-syncs
+  // on popstate (back/forward) plus every pathname change.
   const getActiveNav = () => {
+    if (typeof window === 'undefined') return '';
     if (pathname === '/') return 'Home';
     if (pathname === '/brands') return 'Brands';
     if (pathname === '/shop' || pathname.startsWith('/shop')) {
-      if (typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const cat = params.get('category');
-        if (cat) {
-          const found = navItems.find((c) => c.href.includes(`category=${cat}`));
-          return found?.name ?? 'Shop All';
-        }
+      const cat = new URLSearchParams(window.location.search).get('category');
+      if (cat) {
+        const found = navItems.find((c) => c.href.includes(`category=${cat}`));
+        return found?.name ?? 'Shop All';
       }
       return 'Shop All';
     }
     return '';
   };
   const [activeNav, setActiveNav] = useState('');
-  useEffect(() => { setActiveNav(getActiveNav()); }, [pathname]);
+  useEffect(() => {
+    setActiveNav(getActiveNav());
+  }, [pathname]);
+  useEffect(() => {
+    const onPop = () => setActiveNav(getActiveNav());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [pathname]);
 
   const handleLogout = async () => {
     await logout();
@@ -90,13 +106,26 @@ export default function Header() {
   return (
     <>
       {/* ── Announcement bar ─────────────────────────────────────── */}
-      <div className="bg-primary-500 text-white text-center py-1.5 sm:py-2 text-xs sm:text-sm font-semibold tracking-wide overflow-hidden">
-        <span className="block truncate px-4">
-          Free shipping on orders over $30 &nbsp;·&nbsp; Use code{' '}
-          <span className="underline underline-offset-2 font-extrabold">BLOOM10</span>{' '}
-          for 10% off
-        </span>
-      </div>
+      {announcementVisible && (
+        <div className="bg-primary-500 text-white text-center py-1.5 sm:py-2 text-xs sm:text-sm font-semibold tracking-wide overflow-hidden relative">
+          <span className="block truncate px-10 sm:px-12">
+            Free shipping on orders over $30 &nbsp;·&nbsp; Use code{' '}
+            <span className="underline underline-offset-2 font-extrabold">BLOOM10</span>{' '}
+            for 10% off
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setAnnouncementVisible(false);
+              try { localStorage.setItem(ANNOUNCEMENT_KEY, '1'); } catch { /* ignore */ }
+            }}
+            className="absolute right-1 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-white/20 transition-colors"
+            aria-label="Dismiss announcement"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* ── Main header ──────────────────────────────────────────── */}
       <header
@@ -243,7 +272,7 @@ export default function Header() {
 
       {/* ── Full-screen search overlay (mobile) ───────────────────── */}
       {searchOpen && (
-        <div className="fixed inset-0 z-[60] bg-white flex flex-col lg:hidden">
+        <div role="dialog" aria-modal="true" aria-label="Search products" className="fixed inset-0 z-[60] bg-white flex flex-col lg:hidden">
           <div className="flex items-center gap-3 px-4 py-3 border-b border-blush-100">
             <button
               onClick={() => { setSearchOpen(false); setSearchQuery(''); }}
@@ -291,8 +320,10 @@ export default function Header() {
 
       {/* ── Desktop search overlay ────────────────────────────────── */}
       {searchOpen && (
-        <div className="hidden lg:flex fixed inset-0 z-[60] bg-black/20 backdrop-blur-sm items-start justify-center pt-24">
-          <div className="w-full max-w-lg bg-white rounded-4xl shadow-pink-lg p-6">
+        <div className="hidden lg:flex fixed inset-0 z-[60] bg-black/20 backdrop-blur-sm items-start justify-center pt-24"
+          onClick={() => { setSearchOpen(false); setSearchQuery(''); }}>
+          <div role="dialog" aria-modal="true" aria-label="Search products" className="w-full max-w-lg bg-white rounded-4xl shadow-pink-lg p-6 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}>
             <form onSubmit={handleSearch} className="flex items-center gap-3">
               <Search className="h-5 w-5 text-gray-400 shrink-0" />
               <input

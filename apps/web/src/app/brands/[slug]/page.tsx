@@ -37,12 +37,15 @@ function ProductCard({ product }: { product: BrandProduct }) {
 
   return (
     <Link href={`/product/${product.slug}`} className="card group block">
-      <div className="aspect-square bg-blush-50 flex items-center justify-center overflow-hidden rounded-t-3xl">
+      <div className="relative aspect-square bg-blush-50 flex items-center justify-center overflow-hidden rounded-t-3xl">
         {product.images.length > 0 ? (
-          <img
+          <Image
             src={product.images[0].url}
             alt={product.images[0].alt || product.name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            fill
+            sizes="(max-width: 640px) 50vw, 25vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-105"
+            unoptimized
           />
         ) : (
           <Package className="h-10 w-10 text-primary-200 opacity-60" />

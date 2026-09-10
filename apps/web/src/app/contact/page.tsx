@@ -130,10 +130,22 @@ export default function ContactPage() {
                 </div>
               </div>
 
-              {/* Map Placeholder */}
-              <div className="card overflow-hidden">
-                <div className="h-48 bg-gray-200 flex items-center justify-center">
-                  <span className="text-gray-400">Google Map</span>
+              {/* Quick order channels */}
+              <div className="card p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">Quick Order Channels</h3>
+                <div className="space-y-4">
+                  {[
+                    { icon: MessageCircle, label: 'Telegram', value: '@skinbloomingbeauty2' },
+                    { icon: MessageCircle, label: 'Facebook', value: 'Blooming Beauty Skin' },
+                  ].map((c) => (
+                    <div key={c.label} className="flex items-start gap-3">
+                      <c.icon className="h-5 w-5 text-primary-600 mt-0.5" />
+                      <div>
+                        <p className="text-sm font-medium">{c.label}</p>
+                        <p className="text-sm text-gray-600">{c.value}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
