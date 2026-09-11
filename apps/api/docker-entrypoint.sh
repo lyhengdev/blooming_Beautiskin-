@@ -14,9 +14,9 @@ if [ "${SKIP_MIGRATIONS}" != "true" ]; then
   MIGRATIONS_TABLE="$(cd /app/apps/api && node -e "
     const { PrismaClient } = require('@prisma/client');
     const p = new PrismaClient();
-    p.\$queryRawUnsafe(\"SELECT to_regclass('_prisma_migrations') AS t\")
+    p.\$queryRawUnsafe(\"SELECT to_regclass('_prisma_migrations')::text AS t\")
       .then(r => { console.log(r[0] && r[0].t ? 'yes' : 'no'); return p.\$disconnect(); })
-      .catch(() => { console.log('unknown'); return p.\$disconnect(); });
+      .catch((e) => { console.log('unknown' + (e && e.message ? ' (' + e.message + ')' : '')); return p.\$disconnect(); });
   " 2>&1)"
 
   if [ "${MIGRATIONS_TABLE}" = "yes" ]; then
