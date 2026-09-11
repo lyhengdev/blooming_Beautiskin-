@@ -50,6 +50,17 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Drop empty-string query params so clients sending minPrice=&maxPrice= aren't
+// rejected by validators (e.g. isFloat on an empty string).
+app.use((req, _res, next) => {
+  if (req.query && typeof req.query === 'object') {
+    for (const key of Object.keys(req.query)) {
+      if (req.query[key] === '') delete req.query[key];
+    }
+  }
+  next();
+});
+
 // Global rate limit — basic protection for the whole API
 app.use(globalLimiter);
 

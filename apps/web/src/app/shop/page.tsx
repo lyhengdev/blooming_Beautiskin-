@@ -12,6 +12,10 @@ import EmptyState from '@/components/ui/EmptyState';
 import ErrorState from '@/components/ui/ErrorState';
 import api from '@/lib/api';
 
+function cleanParams(params: Record<string, string | number | undefined>) {
+  return Object.fromEntries(Object.entries(params).filter(([, value]) => value !== '' && value !== undefined && value !== null));
+}
+
 interface Product {
   id: string;
   name: string;
@@ -75,7 +79,7 @@ function ShopContent() {
       page: currentPage,
     }],
     queryFn: () => api.get('/products', {
-      params: {
+      params: cleanParams({
         category: categoryParam,
         brand: brandParam,
         skinType: skinTypeParam,
@@ -85,7 +89,7 @@ function ShopContent() {
         maxPrice: maxPriceParam,
         page: currentPage,
         limit: 12,
-      },
+      }),
     }),
   });
 
