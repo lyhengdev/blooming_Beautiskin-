@@ -95,6 +95,44 @@ test('camera decodes one item per opening and releases its media tracks', async 
   await expect(page.getByRole('status')).toContainText('quantity 2', { timeout: 20000 });
 });
 
+test('zoom controls appear when the camera track supports zoom', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, '__zoomApplied', { value: [], configurable: true });
+    Object.defineProperty(navigator.mediaDevices, 'getUserMedia', { value: async () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 640; canvas.height = 480;
+      const ctx = canvas.getContext('2d')!;
+      const draw = () => { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 640, 480); ctx.fillStyle = '#000'; ctx.fillRect(200, 180, 240, 120); };
+      draw();
+      const stream = canvas.captureStream(10);
+      const track = stream.getVideoTracks()[0];
+      const timer = setInterval(draw, 100);
+      Object.defineProperty(track, 'getCapabilities', { value: () => ({ zoom: { min: 1, max: 4, step: 1 } }) });
+      const origApply = track.applyConstraints?.bind(track);
+      if (origApply) {
+        track.applyConstraints = (constraints: any) => {
+          if (constraints?.advanced?.[0]?.zoom) {
+            window.__zoomApplied.push(String(constraints.advanced[0].zoom));
+            return Promise.resolve();
+          }
+          return origApply(constraints);
+        };
+      }
+      return stream;
+    } });
+  });
+  await page.goto('/admin/online-selling');
+  await page.getByRole('button', { name: 'Scan with camera' }).click();
+  const group = page.getByRole('group', { name: 'Camera zoom' });
+  await expect(group).toBeVisible({ timeout: 15000 });
+  await expect(group.getByRole('button')).toHaveCount(4);
+  await group.getByRole('button', { name: 'Zoom 2x', exact: true }).click();
+  await expect(group.getByRole('button', { name: 'Zoom 2x (current)' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close camera' }).click();
+  await expect(page.getByRole('dialog', { name: 'Scan barcode', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => (window as any).__zoomApplied)).toContain('2');
+});
+
 test('scan a new product, save it, then resolve it in selling', async ({ page }) => {
   const code = `BBS-UI-${Date.now()}`;
   let id = '';

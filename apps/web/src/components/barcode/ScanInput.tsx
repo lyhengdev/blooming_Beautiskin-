@@ -17,8 +17,23 @@ export default function ScanInput({ onScan, disabled = false, autoFocus = false,
   const [camera, setCamera] = useState(false);
   const [facing, setFacing] = useState<'environment' | 'user'>('environment');
   const [format, setFormat] = useState('');
+  const [zoomLevels, setZoomLevels] = useState<number[]>([]);
+  const [zoom, setZoom] = useState(1);
+  const [zoomSupported, setZoomSupported] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const trackRef = useRef<MediaStreamTrack | null>(null);
+
+  async function applyZoom(level: number) {
+    const track = trackRef.current;
+    if (!track) return;
+    try {
+      await track.applyConstraints({ advanced: [{ zoom: level }] } as unknown as MediaTrackConstraints);
+      setZoom(level);
+    } catch {
+      setStatus('Zoom not supported on this camera.');
+    }
+  }
   const queue = useRef(Promise.resolve());
   const pending = useRef(0);
   const pendingCallback = useRef(onPendingChange);
@@ -61,6 +76,9 @@ export default function ScanInput({ onScan, disabled = false, autoFocus = false,
     let accepted = false;
     let controls: { stop: () => void } | undefined;
     const element = video.current;
+    trackRef.current = null;
+    setZoomLevels([]);
+    setZoomSupported(false);
     async function start() {
       try {
         if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
@@ -73,7 +91,14 @@ export default function ScanInput({ onScan, disabled = false, autoFocus = false,
         const hints = new Map();
         hints.set(DecodeHintType.POSSIBLE_FORMATS, [BarcodeFormat.EAN_13, BarcodeFormat.EAN_8, BarcodeFormat.UPC_A, BarcodeFormat.CODE_128]);
         const reader = new BrowserMultiFormatReader(hints);
-        controls = await reader.decodeFromConstraints({ video: { facingMode: { ideal: facing } }, audio: false }, element, (result, _error, scanner) => {
+        controls = await reader.decodeFromConstraints({
+          video: {
+            facingMode: { ideal: facing },
+            width: { ideal: 1920, max: 2560 },
+            height: { ideal: 1080, max: 1440 },
+          },
+          audio: false,
+        }, element, (result, _error, scanner) => {
           if (!result || accepted || cancelled) return;
           accepted = true;
           scanner.stop();
@@ -82,6 +107,28 @@ export default function ScanInput({ onScan, disabled = false, autoFocus = false,
           input.current?.focus();
         });
         if (cancelled) controls.stop();
+
+        // Wait for the stream to attach, then enable smart auto-focus + zoom.
+        const track = element.srcObject instanceof MediaStream
+          ? element.srcObject.getVideoTracks()[0]
+          : undefined;
+        if (track) {
+          trackRef.current = track;
+          const capabilities: Record<string, unknown> = typeof track.getCapabilities === 'function' ? track.getCapabilities() as unknown as Record<string, unknown> : {};
+          const focusModes = capabilities.focusMode;
+          if (Array.isArray(focusModes) && focusModes.includes('continuous')) {
+            try { await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] } as unknown as MediaTrackConstraints); } catch { /* optional */ }
+          }
+          const capZoom = capabilities.zoom as { min?: number; max?: number; step?: number } | undefined;
+          if (capZoom && typeof capZoom.max === 'number' && capZoom.max > 1) {
+            const levels = [1, 2, 3, 4].filter((level) => level <= capZoom.max! + 0.0001);
+            if (levels.length > 1) {
+              setZoomLevels(levels);
+              setZoomSupported(true);
+              try { await track.applyConstraints({ advanced: [{ zoom: levels[0] }] } as unknown as MediaTrackConstraints); } catch { /* optional */ }
+            }
+          }
+        }
       } catch (error) {
         if (!cancelled) {
           setFailed(true);
@@ -94,6 +141,7 @@ export default function ScanInput({ onScan, disabled = false, autoFocus = false,
     return () => {
       cancelled = true;
       controls?.stop();
+      trackRef.current = null;
       if (element?.srcObject instanceof MediaStream) element.srcObject.getTracks().forEach((track) => track.stop());
     };
   }, [camera, disabled, facing]);
@@ -119,7 +167,22 @@ export default function ScanInput({ onScan, disabled = false, autoFocus = false,
         <div className="w-full max-w-lg rounded-lg bg-white p-4">
           <div className="mb-3 flex items-center justify-between"><h2 className="font-bold">Scan barcode</h2><button autoFocus type="button" onClick={() => { setCamera(false); input.current?.focus(); }} aria-label="Close camera" className="p-2"><X className="h-5 w-5" /></button></div>
           <video ref={video} muted playsInline className="aspect-[4/3] w-full rounded-lg bg-black object-cover" />
-          <button type="button" onClick={() => setFacing((current) => current === 'environment' ? 'user' : 'environment')} className="mt-3 rounded-lg border px-3 py-2 text-sm">Switch camera</button>
+          {zoomSupported && zoomLevels.length > 1 && (
+            <div className="mt-3 flex items-center gap-2" role="group" aria-label="Camera zoom">
+              <span className="text-xs font-semibold text-gray-500">Zoom</span>
+              {zoomLevels.map((level) => (
+                <button key={level} type="button" onClick={() => void applyZoom(level)}
+                  aria-label={`Zoom ${level}x${level === zoom ? ' (current)' : ''}`}
+                  className={`min-w-9 rounded-lg border px-2 py-1 text-sm ${level === zoom ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-300 text-gray-700'}`}>
+                  {level}x
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <button type="button" onClick={() => setFacing((current) => current === 'environment' ? 'user' : 'environment')} className="rounded-lg border px-3 py-2 text-sm">Switch camera</button>
+            <p className="text-xs text-gray-500">Hold the barcode steady and level. Move farther away and zoom in if needed.</p>
+          </div>
         </div>
       </div>}
     </div>
