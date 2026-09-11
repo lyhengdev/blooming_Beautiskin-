@@ -305,7 +305,7 @@ export default function AdminCategoriesPage() {
     queryFn: () => api.get('/categories/admin'),
   });
 
-  const categories: Category[] = categoriesRes?.data?.data?.categories ?? [];
+  const categories: Category[] = useMemo(() => categoriesRes?.data?.data?.categories ?? [], [categoriesRes]);
 
   // Organize into tree for display
   const { topLevel, childMap } = useMemo(() => {

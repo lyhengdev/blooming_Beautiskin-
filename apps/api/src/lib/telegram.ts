@@ -1,10 +1,18 @@
 import axios from 'axios';
+import type { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
 import { renderInvoice } from './invoiceImage';
 import FormData from 'form-data';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+function formatAxiosError(err: unknown): unknown {
+  if (axios.isAxiosError(err)) {
+    return err.response?.data || err.message;
+  }
+  return err instanceof Error ? err.message : err;
+}
 
 // ── Send message ─────────────────────────────────────────────────────────────
 
@@ -30,8 +38,8 @@ export async function sendTelegramMessage(
       { timeout: 10_000 },
     );
     return true;
-  } catch (err: any) {
-    console.error('Telegram send failed:', err?.response?.data || err.message);
+  } catch (err: unknown) {
+    console.error('Telegram send failed:', formatAxiosError(err));
     return false;
   }
 }
@@ -73,8 +81,8 @@ export async function sendTelegramPhoto(
       },
     );
     return true;
-  } catch (err: any) {
-    console.error('Telegram photo send failed:', err?.response?.data || err.message);
+  } catch (err: unknown) {
+    console.error('Telegram photo send failed:', formatAxiosError(err));
     return false;
   }
 }
@@ -157,7 +165,7 @@ type OrderWithItems = {
   createdAt: Date;
   items: {
     quantity: number;
-    price: any;
+    price: Prisma.Decimal | number | string;
     product: { name: string };
   }[];
 };
@@ -272,7 +280,7 @@ export async function sendInvoice(
       success: true,
       message: `Invoice for ${order.orderNumber} sent to Telegram`,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Failed to render invoice image:', err);
     // Fallback: send text-only invoice
     const invoice = formatInvoice(order, showDetails);
@@ -309,7 +317,7 @@ export function parseManualInvoice(rawBody: string): ManualInvoiceData | null {
   // Split on "---" separator, or find first line starting with Name:
   let productLines: string[] = [];
   let customerLines: string[] = [];
-  let separatorIdx = lines.findIndex((l) => l === '---');
+  const separatorIdx = lines.findIndex((l) => l === '---');
 
   if (separatorIdx !== -1) {
     productLines = lines.slice(0, separatorIdx);
@@ -400,12 +408,20 @@ export function formatManualInvoice(data: ManualInvoiceData, showDetails: boolea
 let lastUpdateId = 0;
 let polling = false;
 
-async function handleBotUpdate(update: any) {
+interface TelegramUpdate {
+  update_id: number;
+  message?: {
+    chat: { id: number | string };
+    text?: string;
+  };
+}
+
+async function handleBotUpdate(update: TelegramUpdate) {
   const message = update.message;
   if (!message) return;
 
   const chatId = String(message.chat.id);
-  const text: string = message.text || '';
+  const text = message.text || '';
 
   if (!text.startsWith('/invoice')) return;
 
@@ -487,7 +503,7 @@ async function pollUpdates() {
       },
     );
 
-    const updates = res.data.result || [];
+    const updates = (res.data.result || []) as TelegramUpdate[];
     for (const update of updates) {
       lastUpdateId = update.update_id;
       await handleBotUpdate(update);

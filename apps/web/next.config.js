@@ -14,6 +14,10 @@ const withPWA = require('next-pwa')({
   ],
   runtimeCaching: [
     {
+      urlPattern: /\/api\/(?:.*\/)?admin(?:\/|\?|$)|\/api\/(?:auth|cart|orders|wishlist|coupons)(?:\/|\?|$)/,
+      handler: 'NetworkOnly',
+    },
+    {
       // Next.js static JS/CSS chunks
       urlPattern: /\/_next\/static\/.+\.(?:css|js|mjs)$/,
       handler: 'StaleWhileRevalidate',
@@ -33,7 +37,7 @@ const withPWA = require('next-pwa')({
       // Public storefront GET endpoints — serve fresh when online, fall back
       // to the last fetched copy offline. Private/stateful paths (auth, cart,
       // orders, admin, coupon validation) deliberately fall through.
-      urlPattern: /\/api\/(?!auth\/|admin\/|carts\/|orders\/|wishlist\/|coupons\/)[^?]+$/,
+      urlPattern: /\/api\/(?!auth\/|admin\/|cart\/|orders\/|wishlist\/|coupons\/)[^?]+$/,
       handler: 'NetworkFirst',
       options: {
         cacheName: 'api-cache',
@@ -66,7 +70,7 @@ const nextConfig = {
         { key: 'X-Frame-Options', value: 'DENY' },
         { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-        { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+        { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
       ],
     },
   ],

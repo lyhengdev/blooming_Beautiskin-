@@ -342,7 +342,7 @@ export default function AdminBrandsPage() {
     queryFn: () => api.get('/brands/admin'),
   });
 
-  const brands: Brand[] = brandsRes?.data?.data?.brands ?? [];
+  const brands: Brand[] = useMemo(() => brandsRes?.data?.data?.brands ?? [], [brandsRes]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return brands;

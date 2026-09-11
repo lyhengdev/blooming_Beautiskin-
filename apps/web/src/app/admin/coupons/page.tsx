@@ -303,7 +303,7 @@ export default function AdminCouponsPage() {
     queryFn: () => api.get('/coupons/admin'),
   });
 
-  const coupons: Coupon[] = couponsRes?.data?.data?.coupons ?? [];
+  const coupons: Coupon[] = useMemo(() => couponsRes?.data?.data?.coupons ?? [], [couponsRes]);
 
   const filtered = useMemo(() => {
     if (!search.trim()) return coupons;

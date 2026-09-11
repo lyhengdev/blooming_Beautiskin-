@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth';
 import { AppError } from '../middlewares/errorHandler';
@@ -93,7 +94,7 @@ export async function getAllReviewsAdmin(req: Request, res: Response) {
   const limitNum = parseInt(limit as string);
   const skip = (pageNum - 1) * limitNum;
 
-  const where: any = {};
+  const where: Prisma.ReviewWhereInput = {};
 
   if (status === 'pending') where.isApproved = false;
   else if (status === 'approved') where.isApproved = true;

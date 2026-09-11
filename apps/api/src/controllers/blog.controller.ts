@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth';
 import { slugify } from '../utils/helpers';
+import { Prisma } from '@prisma/client';
 
 // ── Public endpoints ──────────────────────────────────────────────────────────
 
@@ -13,7 +14,7 @@ export async function getPosts(req: Request, res: Response) {
   const limitNum = parseInt(limit as string);
   const skip = (pageNum - 1) * limitNum;
 
-  const where: any = { publishedAt: { not: null } };
+  const where: Prisma.BlogPostWhereInput = { publishedAt: { not: null } };
   if (tag) {
     where.tags = { has: tag as string };
   }
@@ -75,7 +76,7 @@ export async function getAllPostsAdmin(req: Request, res: Response) {
   const limitNum = parseInt(limit as string);
   const skip = (pageNum - 1) * limitNum;
 
-  const where: any = {};
+  const where: Prisma.BlogPostWhereInput = {};
 
   if (search) {
     const q = search as string;

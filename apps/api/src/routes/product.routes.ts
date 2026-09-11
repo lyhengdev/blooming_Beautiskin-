@@ -4,6 +4,7 @@ import { validate } from '../middlewares/validate';
 import { asyncHandler } from '../middlewares/asyncHandler';
 import { authenticate, authorize } from '../middlewares/auth';
 import * as productController from '../controllers/product.controller';
+import { lookupBarcode, generateBarcode } from '../controllers/barcode.controller';
 
 const router = Router();
 
@@ -37,6 +38,9 @@ router.get('/:slug/related', asyncHandler(productController.getRelatedProducts))
 
 // ── Admin — all require ADMIN role ────────────────────────────────────────────
 router.use('/admin', authenticate, authorize('ADMIN', 'SUPER_ADMIN'));
+router.use('/admin', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+router.get('/admin/barcode-lookup', asyncHandler(lookupBarcode));
+router.post('/admin/:id/barcodes/generate', [body('variantId').optional().isString().notEmpty()], validate, asyncHandler(generateBarcode));
 
 router.get('/admin', asyncHandler(productController.getAllProductsAdmin));
 
@@ -62,6 +66,9 @@ router.post(
     body('concerns').optional().isArray(),
     body('images').optional().isArray(),
     body('variants').optional().isArray(),
+    body('variants.*.id').optional().isString().notEmpty(),
+    body('variants.*.price').optional().isFloat({ min: 0 }),
+    body('variants.*.stock').optional().isInt({ min: 0 }),
   ],
   validate,
   asyncHandler(productController.createProduct)
@@ -87,6 +94,9 @@ router.put(
     body('concerns').optional().isArray(),
     body('images').optional().isArray(),
     body('variants').optional().isArray(),
+    body('variants.*.id').optional().isString().notEmpty(),
+    body('variants.*.price').optional().isFloat({ min: 0 }),
+    body('variants.*.stock').optional().isInt({ min: 0 }),
   ],
   validate,
   asyncHandler(productController.updateProduct)

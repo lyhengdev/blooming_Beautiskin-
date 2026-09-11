@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 
@@ -41,7 +42,7 @@ export async function getAllSubscribersAdmin(req: Request, res: Response) {
   const limitNum = parseInt(limit as string);
   const skip = (pageNum - 1) * limitNum;
 
-  const where: any = {};
+  const where: Prisma.NewsletterSubscriberWhereInput = {};
   if (active === 'true') where.isActive = true;
   else if (active === 'false') where.isActive = false;
 

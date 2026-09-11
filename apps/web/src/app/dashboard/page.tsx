@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { User, Package, Heart, MapPin, Star, Lock, LogOut } from 'lucide-react';
+import { User, Package, Heart, MapPin, Star, Lock, LogOut, Plus, Trash2, CheckCircle, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Header from '@/components/layout/Header';
@@ -13,6 +13,32 @@ import { useAuthStore } from '@/stores/authStore';
 import api from '@/lib/api';
 
 const VALID_TABS = ['profile', 'orders', 'wishlist', 'addresses', 'reviews'];
+
+const CAMBODIAN_PROVINCES = [
+  'Phnom Penh',
+  'Banteay Meanchey',
+  'Battambang',
+  'Kampong Cham',
+  'Kampong Chhnang',
+  'Kampong Speu',
+  'Kampong Thom',
+  'Kampot',
+  'Kandal',
+  'Koh Kong',
+  'Kratie',
+  'Mondulkiri',
+  'Pailin',
+  'Preah Vihear',
+  'Prey Veng',
+  'Pursat',
+  'Ratanakiri',
+  'Siem Reap',
+  'Sihanoukville',
+  'Stung Treng',
+  'Svay Rieng',
+  'Takeo',
+  'Tboung Khmum',
+];
 
 const tabs = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -43,11 +69,33 @@ interface WishlistItem {
   };
 }
 
+interface Address {
+  id: string;
+  name: string;
+  phone: string;
+  street: string;
+  city: string;
+  province: string;
+  isDefault: boolean;
+}
+
+const EMPTY_ADDRESS_FORM = {
+  name: '',
+  phone: '',
+  street: '',
+  city: '',
+  province: '',
+  isDefault: false,
+};
+
 export default function DashboardContent() {
   const router = useRouter();
   const { user, logout, isInitialized } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState('profile');
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [addressForm, setAddressForm] = useState(EMPTY_ADDRESS_FORM);
 
   // Read ?tab= from the URL on mount and on popstate (back/forward)
   useEffect(() => {
@@ -89,7 +137,20 @@ export default function DashboardContent() {
   });
   const wishlist: WishlistItem[] = wishlistRes?.data?.data?.wishlist ?? [];
 
-  const loading = activeTab === 'orders' ? ordersLoading : activeTab === 'wishlist' ? wishlistLoading : false;
+  const { data: addressesRes, isLoading: addressesLoading } = useQuery({
+    queryKey: ['addresses'],
+    queryFn: () => api.get('/auth/addresses'),
+    enabled: !!user && activeTab === 'addresses',
+  });
+  const addresses: Address[] = addressesRes?.data?.data?.addresses ?? [];
+
+  const loading = activeTab === 'orders'
+    ? ordersLoading
+    : activeTab === 'wishlist'
+      ? wishlistLoading
+      : activeTab === 'addresses'
+        ? addressesLoading
+        : false;
 
   const profileMutation = useMutation({
     mutationFn: (data: { name: string; phone: string }) => api.put('/auth/profile', data),
@@ -107,6 +168,80 @@ export default function DashboardContent() {
 
   const handleSaveProfile = () => {
     profileMutation.mutate(profileData);
+  };
+
+  const resetAddressForm = () => {
+    setAddressForm(EMPTY_ADDRESS_FORM);
+    setEditingAddressId(null);
+    setShowAddressForm(false);
+  };
+
+  const createAddressMutation = useMutation({
+    mutationFn: (data: typeof EMPTY_ADDRESS_FORM) => api.post('/auth/addresses', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['addresses'] });
+      resetAddressForm();
+      toast.success('Address saved');
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to save address');
+    },
+  });
+
+  const updateAddressMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: typeof EMPTY_ADDRESS_FORM }) => api.put(`/auth/addresses/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['addresses'] });
+      resetAddressForm();
+      toast.success('Address updated');
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to update address');
+    },
+  });
+
+  const deleteAddressMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/auth/addresses/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['addresses'] });
+      toast.success('Address deleted');
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to delete address');
+    },
+  });
+
+  const defaultAddressMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/auth/addresses/${id}/default`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['addresses'] });
+      toast.success('Default address updated');
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to update default address');
+    },
+  });
+
+  const handleSubmitAddress = (e: FormEvent) => {
+    e.preventDefault();
+    if (editingAddressId) {
+      updateAddressMutation.mutate({ id: editingAddressId, data: addressForm });
+      return;
+    }
+    createAddressMutation.mutate(addressForm);
+  };
+
+  const handleEditAddress = (address: Address) => {
+    setAddressForm({
+      name: address.name,
+      phone: address.phone,
+      street: address.street,
+      city: address.city,
+      province: address.province,
+      isDefault: address.isDefault,
+    });
+    setEditingAddressId(address.id);
+    setShowAddressForm(true);
   };
 
   if (!isInitialized || !user) {
@@ -276,9 +411,156 @@ export default function DashboardContent() {
                 <div className="card p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold">Saved Addresses</h2>
-                    <button className="btn-secondary text-sm">+ Add Address</button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingAddressId(null);
+                        setAddressForm(EMPTY_ADDRESS_FORM);
+                        setShowAddressForm((value) => !value);
+                      }}
+                      className="btn-secondary text-sm"
+                    >
+                      <Plus className="h-4 w-4" /> Add Address
+                    </button>
                   </div>
-                  <p className="text-gray-500 text-center py-8">No saved addresses yet.</p>
+                  {showAddressForm && (
+                    <form onSubmit={handleSubmitAddress} className="mb-6 rounded-2xl border border-blush-100 bg-blush-50 p-4">
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Receiver Name</label>
+                          <input
+                            type="text"
+                            required
+                            className="input-field"
+                            value={addressForm.name}
+                            onChange={(e) => setAddressForm({ ...addressForm, name: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                          <input
+                            type="tel"
+                            required
+                            className="input-field"
+                            value={addressForm.phone}
+                            onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
+                          />
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Street Address</label>
+                          <input
+                            type="text"
+                            required
+                            className="input-field"
+                            value={addressForm.street}
+                            onChange={(e) => setAddressForm({ ...addressForm, street: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">City/District</label>
+                          <input
+                            type="text"
+                            required
+                            className="input-field"
+                            value={addressForm.city}
+                            onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Province</label>
+                          <select
+                            required
+                            className="input-field"
+                            value={addressForm.province}
+                            onChange={(e) => setAddressForm({ ...addressForm, province: e.target.value })}
+                          >
+                            <option value="">Select province</option>
+                            {CAMBODIAN_PROVINCES.map((province) => (
+                              <option key={province} value={province}>{province}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm font-medium text-gray-700 sm:col-span-2">
+                          <input
+                            type="checkbox"
+                            checked={addressForm.isDefault}
+                            onChange={(e) => setAddressForm({ ...addressForm, isDefault: e.target.checked })}
+                            className="h-4 w-4 rounded border-blush-200 text-primary-600"
+                          />
+                          Use as default shipping address
+                        </label>
+                      </div>
+                      <div className="mt-4 flex gap-3">
+                        <button
+                          type="submit"
+                          disabled={createAddressMutation.isPending || updateAddressMutation.isPending}
+                          className="btn-primary"
+                        >
+                          {editingAddressId ? 'Update Address' : 'Save Address'}
+                        </button>
+                        <button type="button" onClick={resetAddressForm} className="btn-ghost">
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {loading ? (
+                    <div className="space-y-3">
+                      {[1, 2].map((i) => <div key={i} className="h-28 bg-gray-100 rounded-lg animate-pulse" />)}
+                    </div>
+                  ) : addresses.length === 0 ? (
+                    <p className="text-gray-500 text-center py-8">No saved addresses yet.</p>
+                  ) : (
+                    <div className="grid gap-3">
+                      {addresses.map((address) => (
+                        <div key={address.id} className="rounded-2xl border border-blush-100 bg-white p-4">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-semibold text-gray-900">{address.name}</p>
+                                {address.isDefault && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                                    <CheckCircle className="h-3 w-3" /> Default
+                                  </span>
+                                )}
+                              </div>
+                              <p className="mt-1 text-sm text-gray-500">{address.phone}</p>
+                              <p className="mt-1 text-sm text-gray-600">{address.street}</p>
+                              <p className="text-sm text-gray-500">{address.city}, {address.province}</p>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {!address.isDefault && (
+                                <button
+                                  type="button"
+                                  onClick={() => defaultAddressMutation.mutate(address.id)}
+                                  className="rounded-lg border border-blush-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:border-primary-300 hover:text-primary-600"
+                                >
+                                  Set Default
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleEditAddress(address)}
+                                className="rounded-lg border border-blush-200 p-2 text-gray-500 hover:border-primary-300 hover:text-primary-600"
+                                aria-label="Edit address"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => deleteAddressMutation.mutate(address.id)}
+                                className="rounded-lg border border-red-100 p-2 text-red-500 hover:bg-red-50"
+                                aria-label="Delete address"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 

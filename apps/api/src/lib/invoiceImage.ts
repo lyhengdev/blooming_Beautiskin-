@@ -4,7 +4,16 @@ import { join, resolve } from 'path';
 import { getReceiptConfig } from './receiptConfig';
 
 // DOM globals used only inside page.evaluate callbacks (run in the browser).
-declare const document: any;
+declare const document: {
+  fonts?: {
+    ready?: Promise<void>;
+    load: (font: string) => Promise<unknown>;
+  };
+  body: {
+    scrollWidth: number;
+    scrollHeight: number;
+  };
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Blooming Beauty Skin — DELIVERY INVOICE (Thermal Receipt)
@@ -276,16 +285,15 @@ export async function renderInvoice(data: InvoiceData): Promise<RenderedInvoice>
     await page.setContent(html, { waitUntil: 'load' });
 
     await page.evaluate(async () => {
-      const doc = document as any;
-      if (doc.fonts?.ready) {
-        await doc.fonts.ready.catch(() => undefined);
-        try { await doc.fonts.load('12px "Battambang"'); } catch { /* font may be optional */ }
+      if (document.fonts?.ready) {
+        await document.fonts.ready.catch(() => undefined);
+        try { await document.fonts.load('12px "Battambang"'); } catch { /* font may be optional */ }
       }
     });
 
     const dims = await page.evaluate(() => ({
-      width: Math.max(1, Math.ceil((document as any).body.scrollWidth)),
-      height: Math.max(1, Math.ceil((document as any).body.scrollHeight)),
+      width: Math.max(1, Math.ceil(document.body.scrollWidth)),
+      height: Math.max(1, Math.ceil(document.body.scrollHeight)),
     }));
 
     // Clip in logical units (multiplied by deviceScaleFactor automatically).

@@ -3,7 +3,7 @@ import { body } from 'express-validator';
 import { validate } from '../middlewares/validate';
 import { asyncHandler } from '../middlewares/asyncHandler';
 import * as cartController from '../controllers/cart.controller';
-import { authenticate, optionalAuth } from '../middlewares/auth';
+import { optionalAuth } from '../middlewares/auth';
 
 const router = Router();
 

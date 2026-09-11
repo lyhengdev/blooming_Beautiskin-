@@ -359,10 +359,13 @@ function BannerCardInner({
     <>
       {/* Image */}
       <div className="aspect-[16/9] bg-blush-50 relative">
-        <img
+        <Image
           src={banner.imageUrl}
           alt="Banner"
-          className="h-full w-full object-cover"
+          fill
+          sizes="(max-width: 768px) 100vw, 33vw"
+          className="object-cover"
+          unoptimized
         />
       </div>
 

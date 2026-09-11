@@ -226,7 +226,7 @@ async function main() {
           : row.name;
 
       // Try upsert by SKU (the CSV ID is unique per product)
-      const product = await prisma.product.upsert({
+      await prisma.product.upsert({
         where: { sku: row.id },
         update: {
           name: row.name,
@@ -256,9 +256,10 @@ async function main() {
       if (created % 50 === 0) {
         console.log(`  Progress: ${created}/${rows.length} products upserted...`);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       skipped++;
-      console.error(`  SKIP "${row.name}" (${row.id}): ${err.message}`);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`  SKIP "${row.name}" (${row.id}): ${message}`);
     }
   }
 

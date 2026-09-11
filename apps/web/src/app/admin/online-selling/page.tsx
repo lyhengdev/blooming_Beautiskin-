@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
+import { isAxiosError } from 'axios';
+import ScanInput, { ScanCode } from '@/components/barcode/ScanInput';
+import { addSaleItem, linePrice, SaleProduct as Product, SaleLine as CartLine, SaleVariant } from '@/lib/saleCart';
 import Image from 'next/image';
 import {
   Loader2, Search, Plus, Minus, Trash2, X, Package,
@@ -23,29 +26,6 @@ const PAYMENT_METHODS = [
   { value: 'ABA_PAY', label: 'ABA Pay' },
   { value: 'CREDIT_CARD', label: 'Credit / Debit Card' },
 ];
-
-interface Product {
-  id: string;
-  name: string;
-  slug: string;
-  price: string;
-  stock: number;
-  trackStock: boolean;
-  isActive: boolean;
-  images: { id: string; url: string; alt?: string }[];
-  variants?: {
-    id: string;
-    name: string;
-    price?: string;
-    stock: number;
-  }[];
-}
-
-interface CartLine {
-  product: Product;
-  qty: number;
-  overridePrice: number | null;
-}
 
 interface Customer {
   id: string;
@@ -71,7 +51,20 @@ export default function OnlineSellingPage() {
   const productPagination = productsRes?.data?.data?.pagination ?? { page: 1, total: 0, totalPages: 1 };
 
   // Cart
-  const [cart, setCart] = useState<CartLine[]>([]);
+  const [cart, setCartState] = useState<CartLine[]>([]);
+  const cartRef = useRef<CartLine[]>([]);
+  function setCart(value: CartLine[] | ((current: CartLine[]) => CartLine[])) {
+    const next = typeof value === 'function' ? value(cartRef.current) : value;
+    cartRef.current = next;
+    setCartState(next);
+  }
+  const [variantProduct, setVariantProduct] = useState<Product | null>(null);
+  const [unknownCode, setUnknownCode] = useState<ScanCode | null>(null);
+  const [lastAdded, setLastAdded] = useState('');
+  const [scanPending, setScanPending] = useState(false);
+  const checkoutRequest = useRef<{ key: string; payload: string } | null>(null);
+  const saleLocked = useRef(false);
+  const cartPanel = useRef<HTMLDivElement>(null);
 
   // Customer form
   const [name, setName] = useState('');
@@ -85,6 +78,7 @@ export default function OnlineSellingPage() {
 
   // Confirmation modal
   const [showConfirm, setShowConfirm] = useState(false);
+  const [checkoutUncertain, setCheckoutUncertain] = useState(false);
 
   // Customer picker
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -98,7 +92,7 @@ export default function OnlineSellingPage() {
   const customers: Customer[] = customersRes?.data?.data?.customers ?? [];
 
   const subtotal = useMemo(
-    () => cart.reduce((sum, l) => sum + (l.overridePrice ?? Number(l.product.price)) * l.qty, 0),
+    () => cart.reduce((sum, l) => sum + Math.round(linePrice(l) * 100) * l.qty, 0) / 100,
     [cart],
   );
   const delivery = parseFloat(deliveryFee) || 0;
@@ -151,39 +145,82 @@ export default function OnlineSellingPage() {
     setRegisterOpen(true);
   }
 
-  function addToCart(product: Product) {
-    setCart((prev) => {
-      const existing = prev.find((l) => l.product.id === product.id);
-      if (existing) {
-        return prev.map((l) =>
-          l.product.id === product.id ? { ...l, qty: l.qty + 1 } : l,
-        );
+  function addToCart(product: Product, variant?: SaleVariant) {
+    if (saleLocked.current) return;
+    if (product.variants?.length && !variant) { setVariantProduct(product); return; }
+    try {
+      setCart((current) => addSaleItem(current, product, variant));
+      setLastAdded(`${product.id}:${variant?.id || 'base'}`);
+    } catch (error) { toast.error((error as Error).message); }
+  }
+
+  async function scanProduct(code: ScanCode) {
+    if (saleLocked.current) throw new Error('Finish or close checkout before scanning.');
+    if (variantProduct) throw new Error('Choose a variant before scanning the next item.');
+    setUnknownCode(null);
+    try {
+      const response = await api.get('/products/admin/barcode-lookup', { params: { code: code.value, format: code.format } });
+      if (saleLocked.current) throw new Error('Checkout is open. Scan this item after closing it.');
+      const { product, variant } = response.data.data as { product: Product; variant?: SaleVariant };
+      if (product.variants?.length && !variant) {
+        setVariantProduct(product);
+        return `Choose a variant for ${product.name}`;
       }
-      return [...prev, { product, qty: 1, overridePrice: null }];
-    });
+      setCart((current) => addSaleItem(current, product, variant || undefined));
+      const key = `${product.id}:${variant?.id || 'base'}`;
+      setLastAdded(key);
+      return `Added ${product.name}${variant ? ` (${variant.name})` : ''}, quantity ${cartRef.current.find((line) => line.key === key)!.qty}`;
+    } catch (error) {
+      if (isAxiosError(error)) {
+        if (error.response?.status === 404) setUnknownCode(code);
+        throw new Error(error.response?.data?.message || 'Connection failed. Scan again when online.');
+      }
+      throw error;
+    }
   }
 
   function changeQty(id: string, delta: number) {
+    if (saleLocked.current) return;
+    const line = cartRef.current.find((item) => item.key === id);
+    if (line && delta > 0) { addToCart(line.product, line.variant); return; }
     setCart((prev) =>
       prev
-        .map((l) => (l.product.id === id ? { ...l, qty: l.qty + delta } : l))
+        .map((l) => (l.key === id ? { ...l, qty: l.qty + delta } : l))
         .filter((l) => l.qty > 0),
     );
   }
 
   function removeLine(id: string) {
-    setCart((prev) => prev.filter((l) => l.product.id !== id));
+    setCart((prev) => prev.filter((l) => l.key !== id));
   }
 
   function setPrice(id: string, price: number) {
-    setCart((prev) => prev.map((l) => (l.product.id === id ? { ...l, overridePrice: price } : l)));
+    setCart((prev) => prev.map((l) => (l.key === id ? { ...l, overridePrice: price } : l)));
+  }
+
+  async function refreshPrices() {
+    try {
+      const updated = await Promise.all(cartRef.current.map(async (line) => {
+        const response = await api.get(`/products/admin/${line.product.id}`);
+        const product = response.data.data.product as Product;
+        const variant = line.variant ? product.variants?.find((item) => item.id === line.variant!.id) : undefined;
+        if (line.variant && !variant) throw new Error(`Variant unavailable: ${line.variant.name}`);
+        return { ...line, product, variant };
+      }));
+      if (saleLocked.current) return;
+      setCart((current) => current.map((line) => {
+        const fresh = updated.find((entry) => entry.key === line.key);
+        return fresh ? { ...line, product: fresh.product, variant: fresh.variant } : line;
+      }));
+      toast.success('Prices and stock refreshed. Review the total before checkout.');
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Unable to refresh prices'); }
   }
 
   // ── Create order ─────────────────────────────────────────────────────────
 
   const createMutation = useMutation({
-    mutationFn: () =>
-      api.post('/orders/admin/create', {
+    mutationFn: () => {
+      const payload = {
         shippingName: name,
         shippingPhone: phone,
         shippingAddress: address,
@@ -195,14 +232,25 @@ export default function OnlineSellingPage() {
         ...(selectedUserId ? { userId: selectedUserId } : {}),
         items: cart.map((l) => ({
           productId: l.product.id,
+          variantId: l.variant?.id,
           quantity: l.qty,
+          expectedPrice: Number(l.variant?.price ?? l.product.price),
           ...(l.overridePrice !== null ? { overridePrice: l.overridePrice } : {}),
         })),
-      }),
+      };
+      const serialized = JSON.stringify(payload);
+      if (!checkoutRequest.current || checkoutRequest.current.payload !== serialized) checkoutRequest.current = { key: crypto.randomUUID(), payload: serialized };
+      return api.post('/orders/admin/create', payload, { headers: { 'Idempotency-Key': checkoutRequest.current.key } });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminOrders'] });
       queryClient.invalidateQueries({ queryKey: ['adminOrderStats'] });
-      toast.success('Order created and sent to Telegram');
+      queryClient.invalidateQueries({ queryKey: ['onlineSellingProducts'] });
+      queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
+      checkoutRequest.current = null;
+      saleLocked.current = false;
+      toast.success('Order created');
+      setCheckoutUncertain(false);
       setShowConfirm(false);
       setCart([]);
       setName(''); setPhone(''); setAddress(''); setCity('');
@@ -213,26 +261,34 @@ export default function OnlineSellingPage() {
       setRegisterPhone('');
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to create order');
-      setShowConfirm(false);
+      const uncertain = !err?.response || err.response.status >= 500;
+      saleLocked.current = uncertain;
+      setCheckoutUncertain(uncertain);
+      toast.error(uncertain ? 'Order confirmation was interrupted. Retry this checkout to check the same sale.' : err?.response?.data?.message || 'Failed to create order');
+      setShowConfirm(uncertain);
     },
   });
 
   const canSubmit =
-    cart.length > 0 && name.trim() && phone.trim() && address.trim() && city.trim() && province;
+    !scanPending && cart.length > 0 && name.trim() && phone.trim() && address.trim() && city.trim() && province;
 
   return (
-    <div>
+    <div className="pb-24 lg:pb-0">
       <div className="mb-6">
         <h1 className="text-2xl font-heading font-extrabold text-gray-900">Online Selling</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Create an order manually and send the invoice to the Telegram seller group.
-        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
         {/* ── Left: Product Selector ─────────────────────────────────────── */}
         <div className="lg:col-span-3">
+          <div className="mb-4 space-y-2">
+            <ScanInput onScan={scanProduct} onPendingChange={setScanPending} disabled={showConfirm || createMutation.isPending || !!variantProduct} autoFocus />
+            {unknownCode && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+              <p className="mb-2 break-all">Unknown barcode: {unknownCode.value}</p>
+              <div className="flex flex-wrap gap-4"><button type="button" onClick={() => { setSearch(unknownCode.value); setProductPage(1); }} className="underline">Search products</button>
+              <a className="underline" target="_blank" rel="noreferrer" href={`/admin/products?barcode=${encodeURIComponent(unknownCode.value)}&format=${encodeURIComponent(unknownCode.format || '')}`}>Create product</a></div>
+            </div>}
+          </div>
           <div className="card p-4">
             <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -257,10 +313,12 @@ export default function OnlineSellingPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[70vh] overflow-y-auto pr-1">
                 {products.map((p) => {
                   const inCart = cart.find((l) => l.product.id === p.id);
+                  const availableStock = p.variants?.length ? p.variants.reduce((sum, variant) => sum + variant.stock, 0) : p.stock;
                   return (
                     <button
                       key={p.id}
                       onClick={() => addToCart(p)}
+                      disabled={createMutation.isPending || (p.trackStock && !p.variants?.length && p.stock < 1)}
                       className="flex items-center gap-3 rounded-2xl border border-blush-100 bg-white p-3 text-left hover:shadow-pink-md transition-all group"
                     >
                       <div className="h-12 w-12 rounded-xl overflow-hidden bg-blush-50 shrink-0 relative">
@@ -279,8 +337,8 @@ export default function OnlineSellingPage() {
                             ${Number(p.price).toFixed(2)}
                           </span>
                           {p.trackStock && (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${p.stock <= 5 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                              {p.stock > 0 ? `${p.stock} in stock` : 'Out of stock'}
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${availableStock <= 5 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                              {availableStock > 0 ? `${availableStock} ${p.variants?.length ? 'across variants' : 'in stock'}` : 'Out of stock'}
                             </span>
                           )}
                         </div>
@@ -330,21 +388,23 @@ export default function OnlineSellingPage() {
         </div>
 
         {/* ── Right: Cart + Customer ─────────────────────────────────────── */}
-        <div className="lg:col-span-2 space-y-4">
+        <div ref={cartPanel} className="lg:col-span-2 space-y-4 scroll-mt-20">
           {/* Cart */}
           <div className="card p-4">
             <h2 className="flex items-center gap-2 font-heading font-extrabold text-gray-900 mb-3">
               <ShoppingCart className="h-4 w-4 text-primary-400" /> Cart ({cart.length})
             </h2>
+            {cart.length > 0 && <button type="button" disabled={createMutation.isPending} onClick={refreshPrices} className="mb-3 text-xs font-semibold text-primary-600">Refresh prices and stock</button>}
 
             {cart.length === 0 ? (
               <p className="text-sm text-gray-400 py-6 text-center">Select products to add them to the order.</p>
             ) : (
               <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
                 {cart.map((l) => (
-                  <div key={l.product.id} className="flex items-center gap-2 rounded-xl border border-blush-100 p-2">
+                  <div key={l.key} className={`flex items-center gap-2 rounded-lg border p-2 ${lastAdded === l.key ? 'border-emerald-300 bg-emerald-50/40' : 'border-blush-100'}`}>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-800 truncate">{l.product.name}</p>
+                      {l.variant && <p className="text-xs text-gray-600">{l.variant.name}</p>}
                       <div className="flex items-center gap-1.5 mt-1">
                         {/* Price override */}
                         <div className="relative">
@@ -353,26 +413,27 @@ export default function OnlineSellingPage() {
                             type="number"
                             step="0.01"
                             min="0"
-                            value={l.overridePrice ?? Number(l.product.price)}
-                            onChange={(e) => setPrice(l.product.id, parseFloat(e.target.value) || 0)}
+                            value={linePrice(l)}
+                            aria-label={`Price for ${l.product.name} ${l.variant?.name || ''}`}
+                            onChange={(e) => setPrice(l.key, parseFloat(e.target.value) || 0)}
                             className="input-field w-20 text-xs py-1 pl-5 pr-1"
                           />
                         </div>
                         <span className="text-[10px] text-gray-400">× {l.qty}</span>
                         <span className="text-[11px] font-bold text-gray-900 ml-auto">
-                          ${((l.overridePrice ?? Number(l.product.price)) * l.qty).toFixed(2)}
+                          ${(linePrice(l) * l.qty).toFixed(2)}
                         </span>
                       </div>
                     </div>
                     <div className="flex flex-col items-center gap-1 shrink-0">
-                      <button onClick={() => changeQty(l.product.id, 1)} className="h-5 w-5 rounded bg-blush-100 flex items-center justify-center hover:bg-blush-200">
+                      <button aria-label={`Increase ${l.product.name} ${l.variant?.name || ''}`} onClick={() => changeQty(l.key, 1)} className="h-8 w-8 rounded bg-blush-100 flex items-center justify-center hover:bg-blush-200">
                         <Plus className="h-3 w-3 text-gray-600" />
                       </button>
-                      <button onClick={() => changeQty(l.product.id, -1)} className="h-5 w-5 rounded bg-blush-100 flex items-center justify-center hover:bg-blush-200">
+                      <button aria-label={`Decrease ${l.product.name} ${l.variant?.name || ''}`} onClick={() => changeQty(l.key, -1)} className="h-8 w-8 rounded bg-blush-100 flex items-center justify-center hover:bg-blush-200">
                         <Minus className="h-3 w-3 text-gray-600" />
                       </button>
                     </div>
-                    <button onClick={() => removeLine(l.product.id)} className="shrink-0 p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-500">
+                    <button aria-label={`Remove ${l.product.name} ${l.variant?.name || ''}`} onClick={() => removeLine(l.key)} className="shrink-0 p-1 rounded hover:bg-red-50 text-gray-300 hover:text-red-500">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -575,7 +636,7 @@ export default function OnlineSellingPage() {
             </div>
 
             <button
-              onClick={() => canSubmit && setShowConfirm(true)}
+              onClick={() => { if (canSubmit) { saleLocked.current = true; setShowConfirm(true); } }}
               disabled={!canSubmit || createMutation.isPending}
               className="btn-primary w-full mt-4 py-3 flex items-center justify-center gap-2 text-sm font-bold disabled:opacity-40"
             >
@@ -590,25 +651,38 @@ export default function OnlineSellingPage() {
       </div>
 
       {/* ── Confirmation Modal ───────────────────────────────────────────── */}
+      {variantProduct && <div role="dialog" aria-modal="true" aria-label="Choose variant" className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="w-full max-w-md rounded-lg bg-white p-5">
+          <div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-base font-bold">{variantProduct.name}</h2><button autoFocus type="button" onClick={() => setVariantProduct(null)} aria-label="Close variant selection" className="p-2"><X className="h-5 w-5" /></button></div>
+          <div className="max-h-80 space-y-2 overflow-auto">{variantProduct.variants?.map((variant) => <button key={variant.id} type="button" disabled={variantProduct.trackStock && variant.stock < 1} onClick={() => { addToCart(variantProduct, variant); setVariantProduct(null); }} className="flex w-full items-center justify-between gap-3 rounded-lg border p-3 text-left text-sm disabled:opacity-40">
+            <span>{variant.name}<span className="block text-xs text-gray-500">{variantProduct.trackStock ? `${variant.stock} in stock` : ''}</span></span><span className="font-semibold">${Number(variant.price).toFixed(2)}</span>
+          </button>)}</div>
+        </div>
+      </div>}
+      {cart.length > 0 && <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t bg-white px-5 py-3 pb-[max(12px,env(safe-area-inset-bottom))] lg:hidden">
+        <div className="text-sm"><span className="font-bold">${total.toFixed(2)}</span><span className="ml-2 text-gray-500">{cart.reduce((sum, line) => sum + line.qty, 0)} items</span></div>
+        <button type="button" onClick={() => cartPanel.current?.scrollIntoView({ behavior: 'smooth' })} className="flex items-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white"><ShoppingCart className="h-4 w-4" />Review sale</button>
+      </div>}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="w-full max-w-lg bg-white rounded-4xl shadow-pink-lg overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-blush-100">
               <h3 className="font-heading font-extrabold text-gray-900">Confirm Order</h3>
-              <button onClick={() => setShowConfirm(false)} className="p-2 rounded-full hover:bg-blush-100">
+              <button disabled={createMutation.isPending || checkoutUncertain} onClick={() => { saleLocked.current = false; setShowConfirm(false); }} className="p-2 rounded-full hover:bg-blush-100">
                 <X className="h-5 w-5 text-gray-500" />
               </button>
             </div>
 
             <div className="px-6 py-5 space-y-4">
+              {checkoutUncertain && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Confirmation interrupted. Retry to retrieve or complete this same sale.</p>}
               <div>
                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Items</p>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
                   {cart.map((l) => (
-                    <div key={l.product.id} className="flex justify-between text-sm">
-                      <span className="text-gray-600">{l.qty} × {l.product.name}</span>
+                    <div key={l.key} className="flex justify-between gap-3 text-sm">
+                      <span className="text-gray-600">{l.qty} × {l.product.name} {l.variant?.name}</span>
                       <span className="font-bold text-gray-900">
-                        ${((l.overridePrice ?? Number(l.product.price)) * l.qty).toFixed(2)}
+                        ${(linePrice(l) * l.qty).toFixed(2)}
                       </span>
                     </div>
                   ))}
@@ -647,7 +721,7 @@ export default function OnlineSellingPage() {
             </div>
 
             <div className="flex gap-2 px-6 py-4 border-t border-blush-100 bg-blush-50/50">
-              <button onClick={() => setShowConfirm(false)} className="btn-secondary flex-1 py-2.5 text-sm">
+              <button disabled={createMutation.isPending || checkoutUncertain} onClick={() => { saleLocked.current = false; setShowConfirm(false); }} className="btn-secondary flex-1 py-2.5 text-sm">
                 Cancel
               </button>
               <button

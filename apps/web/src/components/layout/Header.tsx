@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import {
   ShoppingBag, Search, User, X, Heart, LogOut,
@@ -72,7 +72,7 @@ export default function Header() {
   // Active category from URL — resolved client-side inside the effect so
   // it never runs during SSR (avoids hydration mismatches), and re-syncs
   // on popstate (back/forward) plus every pathname change.
-  const getActiveNav = () => {
+  const getActiveNav = useCallback(() => {
     if (typeof window === 'undefined') return '';
     if (pathname === '/') return 'Home';
     if (pathname === '/brands') return 'Brands';
@@ -85,16 +85,16 @@ export default function Header() {
       return 'Shop All';
     }
     return '';
-  };
+  }, [pathname]);
   const [activeNav, setActiveNav] = useState('');
   useEffect(() => {
     setActiveNav(getActiveNav());
-  }, [pathname]);
+  }, [getActiveNav]);
   useEffect(() => {
     const onPop = () => setActiveNav(getActiveNav());
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [pathname]);
+  }, [getActiveNav]);
 
   const handleLogout = async () => {
     await logout();

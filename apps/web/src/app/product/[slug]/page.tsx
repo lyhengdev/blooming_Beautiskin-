@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
-import { Heart, ShoppingBag, Star, Minus, Plus, ChevronRight, Package, Zap } from 'lucide-react';
+import { Heart, ShoppingBag, Star, Minus, Plus, ChevronRight, Package, Zap, ShieldCheck, Truck, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
@@ -287,6 +287,20 @@ export default function ProductDetailPage() {
                 )}
               </div>
 
+              <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                {[
+                  { icon: ShieldCheck, title: 'Authentic', text: 'Verified skincare stock' },
+                  { icon: Truck, title: 'Cambodia delivery', text: 'Phnom Penh and provinces' },
+                  { icon: RotateCcw, title: 'Seller support', text: 'Help before and after order' },
+                ].map(({ icon: Icon, title, text }) => (
+                  <div key={title} className="rounded-xl border border-blush-100 bg-blush-50 px-3 py-3">
+                    <Icon className="h-4 w-4 text-primary-500" />
+                    <p className="mt-2 text-xs font-bold text-gray-800">{title}</p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-gray-500">{text}</p>
+                  </div>
+                ))}
+              </div>
+
               <div className="mt-6 flex items-center gap-4">
                 <div className="flex items-center border rounded-lg">
                   <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="p-3 hover:bg-gray-50"><Minus className="h-4 w-4" /></button>
@@ -453,10 +467,10 @@ export default function ProductDetailPage() {
                         <span>({p.reviewCount})</span>
                       </div>
                       <div className="mt-auto flex items-baseline gap-2 pt-2">
-                        <span className="font-bold text-primary-600">${formatPrice(Number(p.price))}</span>
+                        <span className="font-bold text-primary-600">{formatPrice(Number(p.price))}</span>
                         {p.comparePrice && Number(p.comparePrice) > Number(p.price) && (
                           <span className="text-xs text-gray-400 line-through">
-                            ${formatPrice(Number(p.comparePrice))}
+                            {formatPrice(Number(p.comparePrice))}
                           </span>
                         )}
                       </div>

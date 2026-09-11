@@ -1,4 +1,5 @@
 import { prisma } from '../lib/prisma';
+import { SkinType } from '@prisma/client';
 import type { AuthRequest } from '../middlewares/auth';
 import type { Response } from 'express';
 import { AppError } from '../middlewares/errorHandler';
@@ -7,6 +8,19 @@ import { calcAvgRating } from '../utils/helpers';
 
 const recommender = new SmartRecommender();
 let isFitted = false;
+
+const CONCERN_LABELS: Record<string, string> = {
+  acne: 'Acne',
+  aging: 'Anti-aging',
+  dark_spots: 'Hyperpigmentation',
+  hydration: 'Hydration',
+  redness: 'Redness',
+  pores: 'Pores',
+  sun_protection: 'Sun protection',
+  texture: 'Texture',
+  dullness: 'Dullness',
+  dark_circles: 'Dark Circles',
+};
 
 async function ensureFitted(): Promise<void> {
   if (isFitted) return;
@@ -27,6 +41,11 @@ export async function submitQuiz(req: AuthRequest, res: Response) {
   const { skinType, concerns } = req.body;
   const userId = req.user?.id;
 
+  if (typeof skinType !== 'string' || !Object.values(SkinType).includes(skinType as SkinType)) {
+    throw new AppError('Invalid skin type', 400);
+  }
+
+  const profileSkinType = skinType as SkinType;
   const validConcerns = Object.keys(CONCERN_KEYWORDS);
   const invalidConcerns = concerns.filter((c: string) => !validConcerns.includes(c));
   if (invalidConcerns.length > 0) {
@@ -38,16 +57,20 @@ export async function submitQuiz(req: AuthRequest, res: Response) {
     if (existing) {
       await prisma.skinProfile.update({
         where: { userId },
-        data: { skinType: skinType as any, concerns },
+        data: { skinType: profileSkinType, concerns },
       });
     } else {
       await prisma.skinProfile.create({
-        data: { userId, skinType: skinType as any, concerns },
+        data: { userId, skinType: profileSkinType, concerns },
       });
     }
   }
 
   await ensureFitted();
+  const concernQueryValues = concerns.flatMap((concern: string) => [
+    concern,
+    CONCERN_LABELS[concern],
+  ]).filter(Boolean);
 
   const candidateProducts = await prisma.product.findMany({
     where: {
@@ -60,7 +83,7 @@ export async function submitQuiz(req: AuthRequest, res: Response) {
         {
           OR: [
             { skinTypes: { has: skinType } },
-            { concerns: { hasSome: concerns } },
+            { concerns: { hasSome: concernQueryValues } },
           ],
         },
       ],
@@ -77,7 +100,10 @@ export async function submitQuiz(req: AuthRequest, res: Response) {
 
   const enriched = products.map((product) => {
     const concernMatches = concerns.filter((c: string) =>
-      (product.concerns || []).some((pc) => pc.toLowerCase() === c.toLowerCase())
+      (product.concerns || []).some((pc) => {
+        const label = CONCERN_LABELS[c] ?? c;
+        return pc.toLowerCase() === label.toLowerCase() || pc.toLowerCase() === c.toLowerCase();
+      })
     );
     return {
       id: product.id,

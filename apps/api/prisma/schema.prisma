@@ -87,6 +87,7 @@ model Product {
   cartItems  CartItem[]
   orderItems OrderItem[]
   wishlist   Wishlist[]
+  barcodes   Barcode[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -115,6 +116,23 @@ model ProductVariant {
   product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
   cartItems  CartItem[]
   orderItems OrderItem[]
+  barcodes   Barcode[]
+}
+
+model Barcode {
+  id              String   @id @default(cuid())
+  value           String
+  normalizedValue String   @unique
+  format          String
+  productId       String?
+  variantId       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  product         Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant         ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([variantId])
 }
 
 model Category {
@@ -170,6 +188,8 @@ model CartItem {
 
 model Order {
   id               String      @id @default(cuid())
+  requestKey       String?     @unique
+  requestHash      String?
   userId           String
   orderNumber      String      @unique
   status           OrderStatus @default(PENDING)

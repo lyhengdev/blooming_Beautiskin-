@@ -8,7 +8,7 @@ import { Request, Response, NextFunction, RequestHandler } from 'express';
  *   router.get('/:id', asyncHandler(myController));
  */
 export const asyncHandler = (
-  fn: (req: Request, res: Response, next: NextFunction) => any,
+  fn: (req: Request, res: Response, next: NextFunction) => unknown | Promise<unknown>,
 ): RequestHandler => {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);

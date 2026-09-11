@@ -9,10 +9,22 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { useAuthStore } from '@/stores/authStore';
 
+function getSafeReturnTo(value: string | null): string {
+  if (!value) return '/dashboard';
+
+  try {
+    const decoded = decodeURIComponent(value);
+    if (!decoded.startsWith('/') || decoded.startsWith('//')) return '/dashboard';
+    return decoded;
+  } catch {
+    return '/dashboard';
+  }
+}
+
 function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get('returnTo') || '/dashboard';
+  const returnTo = getSafeReturnTo(searchParams.get('returnTo'));
   const { register, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -38,7 +50,7 @@ function RegisterForm() {
         password: formData.password,
         phone: formData.phone || undefined,
       });
-      router.push(decodeURIComponent(returnTo));
+      router.push(returnTo);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Registration failed. Please try again.');
     }

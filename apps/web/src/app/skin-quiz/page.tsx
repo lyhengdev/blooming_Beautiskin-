@@ -18,7 +18,16 @@ const SKIN_TYPES = [
   { id: 'SENSITIVE', title: 'Sensitive', icon: Flower2, desc: 'Easily irritated, redness, stinging or burning' },
 ];
 
-const CONCERNS = ['Hydration', 'Acne', 'Anti-aging', 'Hyperpigmentation', 'Pores', 'Redness', 'Sun protection', 'Soothing'];
+const CONCERNS = [
+  { value: 'hydration', label: 'Hydration' },
+  { value: 'acne', label: 'Acne' },
+  { value: 'aging', label: 'Anti-aging' },
+  { value: 'dark_spots', label: 'Dark spots' },
+  { value: 'pores', label: 'Pores' },
+  { value: 'redness', label: 'Redness' },
+  { value: 'sun_protection', label: 'Sun protection' },
+  { value: 'dullness', label: 'Dullness' },
+];
 
 const STEPS = ['Skin Type', 'Concerns', 'Results'];
 
@@ -32,6 +41,7 @@ type QuizRecommendation = {
   avgRating?: number;
   reviewCount?: number;
   reason?: string;
+  matchReason?: string;
   images?: { url: string; alt?: string | null }[];
 };
 
@@ -150,7 +160,7 @@ export default function SkinQuizPage() {
           <div className="animate-slide-up">
             <div className="mb-6 text-center">
               <p className="text-sm font-medium text-primary-600">Step 1</p>
-              <h2 className="mt-1 text-xl sm:text-2xl font-heading font-bold text-gray-900">What's your skin type?</h2>
+              <h2 className="mt-1 text-xl sm:text-2xl font-heading font-bold text-gray-900">What&apos;s your skin type?</h2>
               <p className="mt-2 text-sm text-gray-500">Choose the option that feels closest to your skin most days.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -191,16 +201,16 @@ export default function SkinQuizPage() {
             <div className="flex flex-wrap justify-center gap-3">
               {CONCERNS.map((concern) => (
                 <button
-                  key={concern}
-                  onClick={() => toggleConcern(concern)}
+                  key={concern.value}
+                  onClick={() => toggleConcern(concern.value)}
                   className={`rounded-full border-2 px-5 py-2.5 text-sm font-medium transition-all duration-200 ${
-                    selectedConcerns.includes(concern)
+                    selectedConcerns.includes(concern.value)
                       ? 'border-primary-600 bg-primary-600 text-white shadow-sm'
                       : 'border-gray-100 bg-white text-gray-700 hover:border-primary-200 hover:bg-primary-50'
                   }`}
                 >
-                  {selectedConcerns.includes(concern) && <Check className="w-3 h-3 inline mr-1" />}
-                  {concern}
+                  {selectedConcerns.includes(concern.value) && <Check className="w-3 h-3 inline mr-1" />}
+                  {concern.label}
                 </button>
               ))}
             </div>
@@ -231,7 +241,10 @@ export default function SkinQuizPage() {
                 </div>
                 <p className="mb-8 mt-3 text-center text-sm text-gray-500">
                   Based on your {SKIN_TYPES.find((t) => t.id === skinType)?.title.toLowerCase()} skin
-                  {selectedConcerns.length > 0 && ` and concerns: ${selectedConcerns.join(', ').toLowerCase()}`}
+                  {selectedConcerns.length > 0 && ` and concerns: ${selectedConcerns
+                    .map((value) => CONCERNS.find((concern) => concern.value === value)?.label ?? value)
+                    .join(', ')
+                    .toLowerCase()}`}
                 </p>
 
                 {recommendations.length === 0 ? (
@@ -259,7 +272,7 @@ export default function SkinQuizPage() {
                           <Link href={`/product/${product.slug}`} className="font-semibold text-gray-900 transition-colors hover:text-primary-600">
                             {product.name}
                           </Link>
-                          <p className="text-sm text-gray-500 mt-0.5">{product.shortDesc || product.reason}</p>
+                          <p className="text-sm text-gray-500 mt-0.5">{product.shortDesc || product.matchReason || product.reason}</p>
                           <div className="flex items-center gap-1 mt-1 justify-center sm:justify-start">
                             <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
                             <span className="text-xs text-gray-600">{product.avgRating || '—'}</span>

@@ -6,14 +6,15 @@ import { useEffect, useState } from 'react';
 import {
   ArrowRight, Droplet, Droplets, Flower2,
   Gift, Heart, Package, ShieldCheck,
-  Sun, Truck, Flame,
+  Sun, Truck, Flame, Sparkles, MessageCircle,
+  Target, ShoppingBag,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import HeroBannerSlider from '@/components/home/HeroBannerSlider';
+import ProductCard from '@/components/product/ProductCard';
 import api from '@/lib/api';
-import { formatPrice } from '@/lib/utils';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -100,47 +101,6 @@ function badgeIcon(name: string): LucideIcon {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function ProductCard({ product }: { product: Product }) {
-  return (
-    <Link href={`/product/${product.slug}`} className="card group block">
-      <div className="relative aspect-square bg-blush-50 flex items-center justify-center overflow-hidden rounded-t-3xl">
-        {product.images.length > 0 ? (
-          <Image
-            src={product.images[0].url}
-            alt={product.images[0].alt || product.name}
-            fill
-            sizes="(max-width: 640px) 50vw, 25vw"
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-            unoptimized
-          />
-        ) : (
-          <Package className="h-10 w-10 text-primary-200 opacity-60" />
-        )}
-      </div>
-      <div className="p-4">
-        <span className="badge-pink text-xs">{product.brand.name}</span>
-        <h3 className="mt-2 line-clamp-2 text-sm font-bold text-gray-800 group-hover:text-primary-600 transition-colors">
-          {product.name}
-        </h3>
-        <p className="mt-1 line-clamp-2 text-xs text-gray-400 leading-relaxed">
-          {product.shortDesc ?? 'A gentle pick for your skincare routine.'}
-        </p>
-        <div className="mt-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-base font-extrabold text-primary-600">{formatPrice(product.price)}</span>
-            {product.comparePrice && (
-              <span className="text-xs text-gray-400 line-through">{formatPrice(product.comparePrice)}</span>
-            )}
-          </div>
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-500 text-white shadow-pink-sm group-hover:bg-primary-600 transition-colors">
-            <ArrowRight className="h-3.5 w-3.5" />
-          </span>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
 function SectionHeader({
   badge, title, subtitle, href, hrefLabel = 'View all',
 }: {
@@ -175,10 +135,12 @@ export default function HomePage() {
   const [promo,       setPromo]       = useState<PromoBanner | null>(null);
   const [badges,      setBadges]      = useState<TrustBadge[]>([]);
   const [social,      setSocial]      = useState<SocialLink[]>([]);
+  const [loadError,   setLoadError]   = useState(false);
 
   useEffect(() => {
     async function load() {
       try {
+        setLoadError(false);
         const [featRes, bestRes, newRes, recRes, brandRes, catRes, homeRes] = await Promise.all([
           api.get('/products/featured'),
           api.get('/products/bestsellers'),
@@ -207,7 +169,7 @@ export default function HomePage() {
         if (s.trustBadges?.items?.length > 0)  setBadges(s.trustBadges.items);
         if (s.social?.links?.length > 0)       setSocial(s.social.links);
       } catch {
-        // no fallback data
+        setLoadError(true);
       }
     }
     load();
@@ -223,6 +185,16 @@ export default function HomePage() {
             SECTION 1 — Hero Banner Slider (fully dynamic, admin-managed)
         ══════════════════════════════════════════════════════════ */}
         <HeroBannerSlider />
+
+        {loadError && (
+          <section className="bg-amber-50 border-y border-amber-100">
+            <div className="container-shop py-4">
+              <p className="text-sm font-semibold text-amber-800">
+                Some storefront sections could not load. Please check the API connection or refresh the page.
+              </p>
+            </div>
+          </section>
+        )}
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 2 — Best-seller Products
@@ -406,10 +378,6 @@ export default function HomePage() {
           <section className="py-10 lg:py-14 bg-white">
             <div className="container-shop">
               <div className="relative overflow-hidden rounded-4xl bg-gradient-to-r from-primary-500 via-primary-500 to-primary-600 px-8 py-10 lg:px-14 lg:py-12">
-                {/* Decorative blobs */}
-                <div className="pointer-events-none absolute -top-10 -right-10 h-52 w-52 rounded-full bg-white/10" />
-                <div className="pointer-events-none absolute -bottom-8 left-1/3 h-36 w-36 rounded-full bg-white/10" />
-
                 <div className="relative flex flex-col items-start gap-6 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white mb-3">
@@ -437,9 +405,9 @@ export default function HomePage() {
         )}
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 9 — Skin Quiz CTA (DISABLED — re-enable when ready)
+            SECTION 9 — Skin Quiz CTA
         ══════════════════════════════════════════════════════════ */}
-        {/* <section className="py-10 lg:py-14 bg-blush-50">
+        <section className="py-10 lg:py-14 bg-blush-50">
           <div className="container-shop">
             <div className="grid gap-8 lg:grid-cols-2 lg:items-center">
               <div>
@@ -449,7 +417,7 @@ export default function HomePage() {
                   Let us guide your routine
                 </h2>
                 <p className="mt-3 text-sm text-gray-500 leading-relaxed max-w-md">
-                  Answer a few quick questions about your skin and we'll recommend
+                  Answer a few quick questions about your skin and we&apos;ll recommend
                   products that actually suit you — no guessing needed.
                 </p>
                 <Link href="/skin-quiz" className="mt-6 btn-primary inline-flex">
@@ -473,7 +441,7 @@ export default function HomePage() {
               </div>
             </div>
           </div>
-        </section> */}
+        </section>
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 10 — Trust Badges

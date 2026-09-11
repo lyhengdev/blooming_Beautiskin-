@@ -5,7 +5,16 @@ import { AppError } from '../middlewares/errorHandler';
 import { generateOrderNumber, calculateShipping } from '../utils/helpers';
 import { sendTelegramMessage, sendTelegramPhoto } from '../lib/telegram';
 import { renderInvoice } from '../lib/invoiceImage';
-import { Prisma } from '@prisma/client';
+import { OrderStatus, Prisma } from '@prisma/client';
+import { createHash } from 'crypto';
+
+interface AdminOrderItemInput {
+  productId: string;
+  variantId?: string;
+  quantity: number;
+  overridePrice?: number | string | null;
+  expectedPrice?: number;
+}
 
 export async function createOrder(req: AuthRequest, res: Response) {
   const userId = req.user!.id;
@@ -273,7 +282,13 @@ export async function getAllOrdersAdmin(req: Request, res: Response) {
   const where: Prisma.OrderWhereInput = {};
 
   if (status) {
-    where.status = status as any;
+    if (typeof status !== 'string' || !VALID_STATUSES.includes(status as OrderStatus)) {
+      throw new AppError(
+        `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`,
+        400,
+      );
+    }
+    where.status = status as OrderStatus;
   }
 
   if (search) {
@@ -424,8 +439,24 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
   }
 
   // Fetch all products in one query
-  const productIds = [...new Set(items.map((it: any) => it.productId))];
-  const products = await prisma.product.findMany({
+  const orderInputItems = items as AdminOrderItemInput[];
+  const requestKey = req.get('Idempotency-Key') ? `${req.user!.id}:${req.get('Idempotency-Key')}` : null;
+  const requestHash = createHash('sha256').update(JSON.stringify(req.body)).digest('hex');
+  let replayed = false;
+  const order = await prisma.$transaction(async (tx) => {
+  if (requestKey) {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${requestKey}))`;
+    const previous = await tx.order.findUnique({ where: { requestKey }, include: {
+      items: { include: { product: { select: { name: true, slug: true } }, variant: true } }, payment: true,
+    } });
+    if (previous) {
+      if (previous.requestHash !== requestHash) throw new AppError('This checkout key was already used for a different sale', 409);
+      replayed = true;
+      return previous;
+    }
+  }
+  const productIds = [...new Set(orderInputItems.map((it) => it.productId))];
+  const products = await tx.product.findMany({
     where: { id: { in: productIds } },
     include: { variants: true },
   });
@@ -435,7 +466,7 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
   const orderItems: { productId: string; variantId?: string; quantity: number; price: number }[] = [];
   let subtotal = 0;
 
-  for (const item of items) {
+  for (const item of orderInputItems) {
     const product = productMap.get(item.productId);
     if (!product) throw new AppError(`Product not found: ${item.productId}`, 400);
     if (!product.isActive) throw new AppError(`Product "${product.name}" is not active`, 400);
@@ -444,8 +475,12 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
       ? product.variants.find((v) => v.id === item.variantId)
       : null;
     if (item.variantId && !variant) throw new AppError(`Variant not found: ${item.variantId}`, 400);
+    if (product.variants.length && !variant) throw new AppError(`Choose a variant for ${product.name}`, 400);
 
     const price = item.overridePrice != null ? Number(item.overridePrice) : Number(variant ? variant.price : product.price);
+    if (item.overridePrice == null && item.expectedPrice !== undefined && price !== item.expectedPrice) {
+      throw new AppError(`Price changed for ${product.name}. Refresh the cart prices and confirm the total.`, 409);
+    }
 
     // Stock check
     if (product.trackStock) {
@@ -464,14 +499,13 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
       quantity: item.quantity,
       price,
     });
-    subtotal += price * item.quantity;
+    subtotal += Math.round(price * 100) * item.quantity / 100;
   }
 
   const shippingCost = deliveryFee != null ? Number(deliveryFee) : 1.5;
-  const total = subtotal + shippingCost;
+  const total = Math.round((subtotal + shippingCost) * 100) / 100;
 
-  // Create order in a transaction
-  const order = await prisma.$transaction(async (tx) => {
+  if (!Number.isFinite(total) || total > 99999999.99) throw new AppError('Order total exceeds the supported amount', 400);
     // Decrement stock
     for (const item of orderItems) {
       const product = productMap.get(item.productId)!;
@@ -498,6 +532,8 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
 
     const newOrder = await tx.order.create({
       data: {
+        requestKey,
+        requestHash: requestKey ? requestHash : null,
         userId: ownerId,
         orderNumber: generateOrderNumber(),
         subtotal,
@@ -540,7 +576,13 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
     return newOrder;
   });
 
+  if (replayed) {
+    res.json({ status: 'success', data: { order }, replayed: true });
+    return;
+  }
+
   // Send Telegram invoice (fire-and-forget)
+  if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
   try {
     const invoiceData = {
       orderNumber: order.orderNumber,
@@ -573,6 +615,7 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
     );
   }
 
+  }
   res.status(201).json({ status: 'success', data: { order } });
 }
 

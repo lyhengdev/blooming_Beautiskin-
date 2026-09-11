@@ -1,13 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useState, Suspense } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { SlidersHorizontal, X, Grid3X3, LayoutList, Package, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { SlidersHorizontal, X, Grid3X3, LayoutList, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import ProductCard from '@/components/product/ProductCard';
+import EmptyState from '@/components/ui/EmptyState';
+import ErrorState from '@/components/ui/ErrorState';
 import api from '@/lib/api';
 
 interface Product {
@@ -44,16 +46,47 @@ function ShopContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [minPrice, setMinPrice] = useState(searchParams.get('minPrice') || '');
+  const [maxPrice, setMaxPrice] = useState(searchParams.get('maxPrice') || '');
 
   const categoryParam = searchParams.get('category') || '';
   const brandParam = searchParams.get('brand') || '';
   const skinTypeParam = searchParams.get('skinType') || '';
   const searchQuery = searchParams.get('search') || '';
   const sortParam = searchParams.get('sort') || 'popular';
+  const minPriceParam = searchParams.get('minPrice') || '';
+  const maxPriceParam = searchParams.get('maxPrice') || '';
 
-  const { data: productsData, isLoading: loading } = useQuery({
-    queryKey: ['products', { category: categoryParam, brand: brandParam, skinType: skinTypeParam, search: searchQuery, sort: sortParam, page: currentPage }],
-    queryFn: () => api.get('/products', { params: { category: categoryParam, brand: brandParam, skinType: skinTypeParam, search: searchQuery, sort: sortParam, page: currentPage, limit: 12 } }),
+  useEffect(() => {
+    setMinPrice(minPriceParam);
+    setMaxPrice(maxPriceParam);
+    setCurrentPage(1);
+  }, [categoryParam, brandParam, skinTypeParam, searchQuery, sortParam, minPriceParam, maxPriceParam]);
+
+  const { data: productsData, isLoading: loading, isError } = useQuery({
+    queryKey: ['products', {
+      category: categoryParam,
+      brand: brandParam,
+      skinType: skinTypeParam,
+      search: searchQuery,
+      sort: sortParam,
+      minPrice: minPriceParam,
+      maxPrice: maxPriceParam,
+      page: currentPage,
+    }],
+    queryFn: () => api.get('/products', {
+      params: {
+        category: categoryParam,
+        brand: brandParam,
+        skinType: skinTypeParam,
+        search: searchQuery,
+        sort: sortParam,
+        minPrice: minPriceParam,
+        maxPrice: maxPriceParam,
+        page: currentPage,
+        limit: 12,
+      },
+    }),
   });
 
   const { data: categoriesData } = useQuery({
@@ -72,7 +105,17 @@ function ShopContent() {
   const categories: Category[] = categoriesData?.data.data.categories ?? [];
   const brands: Brand[] = brandsData?.data.data.brands ?? [];
 
-  const activeFilters = [categoryParam, brandParam, skinTypeParam].filter(Boolean);
+  const getCategoryLabel = (slug: string) => categories.find((cat) => cat.slug === slug)?.name ?? slug;
+  const getBrandLabel = (slug: string) => brands.find((brand) => brand.slug === slug)?.name ?? slug;
+  const getSkinTypeLabel = (value: string) => value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+
+  const activeFilters = [
+    categoryParam && { key: 'category', value: categoryParam, label: getCategoryLabel(categoryParam) },
+    brandParam && { key: 'brand', value: brandParam, label: getBrandLabel(brandParam) },
+    skinTypeParam && { key: 'skinType', value: skinTypeParam, label: `${getSkinTypeLabel(skinTypeParam)} skin` },
+    minPriceParam && { key: 'minPrice', value: minPriceParam, label: `From $${minPriceParam}` },
+    maxPriceParam && { key: 'maxPrice', value: maxPriceParam, label: `Under $${maxPriceParam}` },
+  ].filter(Boolean) as { key: string; value: string; label: string }[];
 
   const SORT_OPTIONS = [
     { value: 'popular', label: 'Most Popular' },
@@ -89,6 +132,34 @@ function ShopContent() {
     setCurrentPage(1);
   };
 
+  const setFilter = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    router.push(`/shop?${params.toString()}`);
+    setShowFilters(false);
+    setCurrentPage(1);
+  };
+
+  const clearFilter = (key: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(key);
+    router.push(`/shop?${params.toString()}`);
+    setCurrentPage(1);
+  };
+
+  const applyPriceFilter = (e: React.FormEvent) => {
+    e.preventDefault();
+    const params = new URLSearchParams(searchParams.toString());
+    if (minPrice.trim()) params.set('minPrice', minPrice.trim());
+    else params.delete('minPrice');
+    if (maxPrice.trim()) params.set('maxPrice', maxPrice.trim());
+    else params.delete('maxPrice');
+    router.push(`/shop?${params.toString()}`);
+    setShowFilters(false);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
@@ -97,7 +168,7 @@ function ShopContent() {
         <div className="bg-gray-50 py-8">
           <div className="container-shop">
             <h1 className="text-2xl sm:text-3xl font-heading font-bold text-gray-900">
-              {searchQuery ? `Search: "${searchQuery}"` : categoryParam ? `${categoryParam} Products` : 'All Products'}
+              {searchQuery ? `Search: "${searchQuery}"` : categoryParam ? `${getCategoryLabel(categoryParam)} Products` : 'All Products'}
             </h1>
             <p className="mt-2 text-gray-500">
               {loading ? 'Loading...' : `${totalProducts} product${totalProducts !== 1 ? 's' : ''} found`}
@@ -122,11 +193,12 @@ function ShopContent() {
                   <h3 className="font-semibold text-gray-900 mb-3">Categories</h3>
                   <div className="space-y-2">
                     {categories.map((cat) => (
-                      <Link key={cat.id}
-                        href={`/shop?category=${cat.slug}`}
-                        className={`block text-sm py-1 ${categoryParam === cat.slug ? 'text-primary-600 font-medium' : 'text-gray-600 hover:text-primary-600'}`}>
+                      <button key={cat.id}
+                        type="button"
+                        onClick={() => setFilter('category', cat.slug)}
+                        className={`block w-full text-left text-sm py-1 ${categoryParam === cat.slug ? 'text-primary-600 font-medium' : 'text-gray-600 hover:text-primary-600'}`}>
                         {cat.name} ({cat._count.products})
-                      </Link>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -135,11 +207,12 @@ function ShopContent() {
                   <h3 className="font-semibold text-gray-900 mb-3">Brands</h3>
                   <div className="space-y-2">
                     {brands.map((brand) => (
-                      <Link key={brand.id}
-                        href={`/shop?brand=${brand.slug}`}
-                        className={`block text-sm py-1 ${brandParam === brand.slug ? 'text-primary-600 font-medium' : 'text-gray-600 hover:text-primary-600'}`}>
+                      <button key={brand.id}
+                        type="button"
+                        onClick={() => setFilter('brand', brand.slug)}
+                        className={`block w-full text-left text-sm py-1 ${brandParam === brand.slug ? 'text-primary-600 font-medium' : 'text-gray-600 hover:text-primary-600'}`}>
                         {brand.name} ({brand._count.products})
-                      </Link>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -148,14 +221,42 @@ function ShopContent() {
                   <h3 className="font-semibold text-gray-900 mb-3">Skin Type</h3>
                   <div className="space-y-2">
                     {['Normal', 'Dry', 'Oily', 'Combination', 'Sensitive'].map((type) => (
-                      <Link key={type}
-                        href={`/shop?skinType=${type.toLowerCase()}`}
-                        className={`block text-sm py-1 ${skinTypeParam === type.toLowerCase() ? 'text-primary-600 font-medium' : 'text-gray-600 hover:text-primary-600'}`}>
+                      <button key={type}
+                        type="button"
+                        onClick={() => setFilter('skinType', type.toLowerCase())}
+                        className={`block w-full text-left text-sm py-1 ${skinTypeParam === type.toLowerCase() ? 'text-primary-600 font-medium' : 'text-gray-600 hover:text-primary-600'}`}>
                         {type}
-                      </Link>
+                      </button>
                     ))}
                   </div>
                 </div>
+
+                <form onSubmit={applyPriceFilter}>
+                  <h3 className="font-semibold text-gray-900 mb-3">Price Range</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="decimal"
+                      value={minPrice}
+                      onChange={(e) => setMinPrice(e.target.value)}
+                      placeholder="Min"
+                      className="input-field px-3 py-2"
+                    />
+                    <input
+                      type="number"
+                      min="0"
+                      inputMode="decimal"
+                      value={maxPrice}
+                      onChange={(e) => setMaxPrice(e.target.value)}
+                      placeholder="Max"
+                      className="input-field px-3 py-2"
+                    />
+                  </div>
+                  <button type="submit" className="mt-3 w-full btn-secondary py-2">
+                    Apply Price
+                  </button>
+                </form>
               </div>
             </aside>
 
@@ -170,16 +271,12 @@ function ShopContent() {
                   </button>
                   {activeFilters.length > 0 && (
                     <div className="flex flex-wrap items-center gap-2">
-                      {activeFilters.map((f) => (
-                        <span key={f} className="flex items-center gap-1 px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-xs">
-                          {f}
-                          <Link href={`/shop?${new URLSearchParams(
-                            Object.fromEntries(
-                              Array.from(searchParams.entries()).filter(([k, v]) => v !== f)
-                            )
-                          ).toString()}`}>
+                    {activeFilters.map((filter) => (
+                        <span key={filter.key} className="flex items-center gap-1 px-3 py-1 bg-primary-50 text-primary-700 rounded-full text-xs">
+                          {filter.label}
+                          <button type="button" onClick={() => clearFilter(filter.key)} aria-label={`Remove ${filter.label} filter`}>
                             <X className="h-3 w-3" />
-                          </Link>
+                          </button>
                         </span>
                       ))}
                     </div>
@@ -224,49 +321,32 @@ function ShopContent() {
                     </div>
                   ))}
                 </div>
+              ) : isError ? (
+                <ErrorState
+                  title="Products could not load"
+                  message="Check the API connection and try again. Your selected filters are still saved."
+                  actionLabel="Retry"
+                  onAction={() => window.location.reload()}
+                />
               ) : products.length === 0 ? (
-                <div className="text-center py-20">
-                  <p className="text-gray-500 text-lg">No products found</p>
-                  <Link href="/shop" className="mt-4 inline-block btn-primary">View All Products</Link>
-                </div>
+                <EmptyState
+                  title="No products match these filters"
+                  message="Try removing a filter or browsing all skincare products."
+                  actionHref="/shop"
+                  actionLabel="View All Products"
+                />
               ) : (
                 <div className={viewMode === 'grid'
                   ? 'grid grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6'
                   : 'space-y-4'
                 }>
                   {products.map((product) => (
-                    <Link key={product.id}
-                      href={`/product/${product.slug}`}
-                      className={`card group ${viewMode === 'list' ? 'flex' : ''}`}>
-                      <div className={`relative ${viewMode === 'list' ? 'w-40 flex-shrink-0' : 'aspect-square'} bg-gray-100 flex items-center justify-center`}>
-                        {product.images.length > 0 ? (
-                          <Image src={product.images[0].url} alt={product.images[0].alt || product.name}
-                            fill className="object-cover" unoptimized />
-                        ) : (
-                          <Package className="h-10 w-10 text-gray-300" />
-                        )}
-                      </div>
-                      <div className="p-4 flex-1">
-                        <p className="text-xs text-primary-600 font-medium">{product.brand.name}</p>
-                        <h3 className="text-sm font-medium text-gray-900 mt-1 group-hover:text-primary-600 transition-colors line-clamp-2">
-                          {product.name}
-                        </h3>
-                        <div className="flex items-center gap-1 mt-2">
-                          {[1, 2, 3, 4, 5].map((s) => (
-                            <span key={s} className={`text-xs ${s <= product.avgRating ? 'text-yellow-400' : 'text-gray-300'}`}>
-                              &#9733;
-                            </span>
-                          ))}
-                          <span className="text-xs text-gray-400 ml-1">({product.reviewCount})</span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <p className="text-lg font-bold text-primary-600">${product.price}</p>
-                          {product.comparePrice && (
-                            <p className="text-sm text-gray-400 line-through">${product.comparePrice}</p>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      view={viewMode}
+                      showRating
+                    />
                   ))}
                 </div>
               )}
@@ -324,33 +404,62 @@ function ShopContent() {
               <div>
                 <h3 className="font-semibold mb-3">Categories</h3>
                 {categories.map((cat) => (
-                  <Link key={cat.id} href={`/shop?category=${cat.slug}`}
-                    onClick={() => setShowFilters(false)}
-                    className={`block text-sm py-2 ${categoryParam === cat.slug ? 'text-primary-600 font-medium' : 'text-gray-600'}`}>
+                  <button key={cat.id}
+                    type="button"
+                    onClick={() => setFilter('category', cat.slug)}
+                    className={`block w-full text-left text-sm py-2 ${categoryParam === cat.slug ? 'text-primary-600 font-medium' : 'text-gray-600'}`}>
                     {cat.name}
-                  </Link>
+                  </button>
                 ))}
               </div>
               <div>
                 <h3 className="font-semibold mb-3">Brands</h3>
                 {brands.map((brand) => (
-                  <Link key={brand.id} href={`/shop?brand=${brand.slug}`}
-                    onClick={() => setShowFilters(false)}
-                    className={`block text-sm py-2 ${brandParam === brand.slug ? 'text-primary-600 font-medium' : 'text-gray-600'}`}>
+                  <button key={brand.id}
+                    type="button"
+                    onClick={() => setFilter('brand', brand.slug)}
+                    className={`block w-full text-left text-sm py-2 ${brandParam === brand.slug ? 'text-primary-600 font-medium' : 'text-gray-600'}`}>
                     {brand.name}
-                  </Link>
+                  </button>
                 ))}
               </div>
               <div>
                 <h3 className="font-semibold mb-3">Skin Type</h3>
                 {['Normal', 'Dry', 'Oily', 'Combination', 'Sensitive'].map((type) => (
-                  <Link key={type} href={`/shop?skinType=${type.toLowerCase()}`}
-                    onClick={() => setShowFilters(false)}
-                    className={`block text-sm py-2 ${skinTypeParam === type.toLowerCase() ? 'text-primary-600 font-medium' : 'text-gray-600'}`}>
+                  <button key={type}
+                    type="button"
+                    onClick={() => setFilter('skinType', type.toLowerCase())}
+                    className={`block w-full text-left text-sm py-2 ${skinTypeParam === type.toLowerCase() ? 'text-primary-600 font-medium' : 'text-gray-600'}`}>
                     {type}
-                  </Link>
+                  </button>
                 ))}
               </div>
+              <form onSubmit={applyPriceFilter}>
+                <h3 className="font-semibold mb-3">Price Range</h3>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="decimal"
+                    value={minPrice}
+                    onChange={(e) => setMinPrice(e.target.value)}
+                    placeholder="Min"
+                    className="input-field px-3 py-2"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    inputMode="decimal"
+                    value={maxPrice}
+                    onChange={(e) => setMaxPrice(e.target.value)}
+                    placeholder="Max"
+                    className="input-field px-3 py-2"
+                  />
+                </div>
+                <button type="submit" className="mt-3 w-full btn-secondary py-2">
+                  Apply Price
+                </button>
+              </form>
               <Link href="/shop" onClick={() => setShowFilters(false)}
                 className="block w-full text-center py-2 text-sm text-gray-500 hover:text-gray-700">
                 Clear All Filters

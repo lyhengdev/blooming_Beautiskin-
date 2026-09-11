@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { Prisma } from '@prisma/client';
 
 export class AppError extends Error {
   public statusCode: number;
@@ -18,6 +19,9 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ) {
+  if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+    return res.status(409).json({ status: 'error', message: 'This barcode, SKU, or other unique value is already assigned. Open the existing item or use a different value.' });
+  }
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       status: 'error',

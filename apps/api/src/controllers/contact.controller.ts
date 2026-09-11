@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 
@@ -27,7 +28,7 @@ export async function getAllMessagesAdmin(req: Request, res: Response) {
   const limitNum = parseInt(limit as string);
   const skip = (pageNum - 1) * limitNum;
 
-  const where: any = {};
+  const where: Prisma.ContactMessageWhereInput = {};
   if (unread === 'true') where.isRead = false;
   else if (unread === 'false') where.isRead = true;
 

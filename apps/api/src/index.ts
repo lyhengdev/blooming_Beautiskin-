@@ -19,7 +19,7 @@ import blogRoutes from './routes/blog.routes';
 import couponRoutes from './routes/coupon.routes';
 import contactRoutes from './routes/contact.routes';
 import newsletterRoutes from './routes/newsletter.routes';
-// import skinQuizRoutes from './routes/skinquiz.routes'; // DISABLED — re-enable when ready
+import skinQuizRoutes from './routes/skinquiz.routes';
 import bannerRoutes from './routes/banner.routes';
 import homeRoutes from './routes/home.routes';
 import adminRoutes from './routes/admin.routes';
@@ -82,7 +82,7 @@ app.use('/api/blog', blogRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/newsletter', newsletterRoutes);
-// app.use('/api/skin-quiz', skinQuizRoutes); // DISABLED
+app.use('/api/skin-quiz', skinQuizRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/admin', adminRoutes);

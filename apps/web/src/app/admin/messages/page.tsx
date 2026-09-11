@@ -27,6 +27,7 @@ function DetailModal({ msg, onClose }: { msg: ContactMsg; onClose: () => void })
       queryClient.invalidateQueries({ queryKey: ['contactUnread'] });
     },
   });
+  const markReadMutate = markRead.mutate;
 
   const markUnread = useMutation({
     mutationFn: () => api.patch(`/contact/admin/${msg.id}/unread`),
@@ -49,9 +50,9 @@ function DetailModal({ msg, onClose }: { msg: ContactMsg; onClose: () => void })
   // Mark as read when opening
   useEffect(() => {
     if (!msg.isRead) {
-      markRead.mutate();
+      markReadMutate();
     }
-  }, []);
+  }, [markReadMutate, msg.isRead]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-8 bg-black/40 backdrop-blur-sm overflow-y-auto">

@@ -3,12 +3,13 @@
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Loader2, Package, ChevronRight } from 'lucide-react';
+import { Loader2, Package, ChevronRight } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
+import ProductCard from '@/components/product/ProductCard';
+import EmptyState from '@/components/ui/EmptyState';
 import api from '@/lib/api';
-import { formatPrice } from '@/lib/utils';
 
 interface BrandProduct {
   id: string;
@@ -27,43 +28,6 @@ interface BrandData {
   logo: string | null;
   description: string | null;
   products: BrandProduct[];
-}
-
-function ProductCard({ product }: { product: BrandProduct }) {
-  const avgRating =
-    product.reviews.length > 0
-      ? product.reviews.reduce((s, r) => s + r.rating, 0) / product.reviews.length
-      : 0;
-
-  return (
-    <Link href={`/product/${product.slug}`} className="card group block">
-      <div className="relative aspect-square bg-blush-50 flex items-center justify-center overflow-hidden rounded-t-3xl">
-        {product.images.length > 0 ? (
-          <Image
-            src={product.images[0].url}
-            alt={product.images[0].alt || product.name}
-            fill
-            sizes="(max-width: 640px) 50vw, 25vw"
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-            unoptimized
-          />
-        ) : (
-          <Package className="h-10 w-10 text-primary-200 opacity-60" />
-        )}
-      </div>
-      <div className="p-4">
-        <h3 className="line-clamp-2 text-sm font-bold text-gray-800 group-hover:text-primary-600 transition-colors">
-          {product.name}
-        </h3>
-        <div className="mt-2 flex items-center justify-between">
-          <span className="text-base font-extrabold text-primary-600">{formatPrice(product.price)}</span>
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-500 text-white shadow-pink-sm group-hover:bg-primary-600 transition-colors">
-            <ArrowRight className="h-3.5 w-3.5" />
-          </span>
-        </div>
-      </div>
-    </Link>
-  );
 }
 
 export default function BrandDetailPage() {
@@ -95,13 +59,13 @@ export default function BrandDetailPage() {
                 <Loader2 className="h-8 w-8 text-primary-400 animate-spin" />
               </div>
             ) : error || !brand ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <Package className="h-12 w-12 text-blush-300 mb-3" />
-                <p className="font-heading font-bold text-gray-500 text-lg">Brand not found</p>
-                <Link href="/brands" className="mt-4 text-sm font-bold text-primary-500 hover:underline">
-                  ← Back to brands
-                </Link>
-              </div>
+              <EmptyState
+                icon={Package}
+                title="Brand not found"
+                message="The brand may be unavailable or the link may have changed."
+                actionHref="/brands"
+                actionLabel="Back to brands"
+              />
             ) : (
               <>
                 {/* Brand header */}
@@ -126,14 +90,27 @@ export default function BrandDetailPage() {
 
                 {/* Products grid */}
                 {brand.products.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <Package className="h-12 w-12 text-blush-300 mb-3" />
-                    <p className="font-heading font-bold text-gray-500 text-lg">No products yet</p>
-                  </div>
+                  <EmptyState
+                    title="No products yet"
+                    message="This brand does not have active products in the shop right now."
+                    actionHref="/shop"
+                    actionLabel="Browse all products"
+                  />
                 ) : (
                   <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
                     {brand.products.map((p) => (
-                      <ProductCard key={p.id} product={p} />
+                      <ProductCard
+                        key={p.id}
+                        product={{
+                          ...p,
+                          brand: { name: brand.name, slug: brand.slug },
+                          avgRating: p.reviews.length > 0
+                            ? p.reviews.reduce((sum, review) => sum + review.rating, 0) / p.reviews.length
+                            : 0,
+                          reviewCount: p.reviews.length,
+                        }}
+                        showDescription={false}
+                      />
                     ))}
                   </div>
                 )}

@@ -4,6 +4,28 @@ import { Prisma } from '@prisma/client';
 import { calcAvgRating, slugify } from '../utils/helpers';
 import { AppError } from '../middlewares/errorHandler';
 import { AuthRequest } from '../middlewares/auth';
+import { barcodeAssignments } from '../lib/barcode';
+
+interface ProductImageInput {
+  url: string;
+  alt?: string | null;
+  sortOrder?: number;
+}
+
+interface ProductVariantInput {
+  id?: string;
+  barcodes?: unknown;
+  name?: string | null;
+  price?: number | string | null;
+  stock?: number | string | null;
+  options?: Prisma.InputJsonValue;
+}
+
+function parseNumberInput(value: number | string | null | undefined, fallback: number): number {
+  if (value === null || value === undefined || value === '') return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
 
 // ── Public endpoints ──────────────────────────────────────────────────────────
 
@@ -35,6 +57,16 @@ export async function getProducts(req: Request, res: Response) {
 
   if (brand) {
     where.brand = { slug: brand as string };
+  }
+
+  if (skinType) {
+    const values = Array.isArray(skinType) ? skinType : [skinType];
+    where.skinTypes = { hasSome: values.map(String) };
+  }
+
+  if (concern) {
+    const values = Array.isArray(concern) ? concern : [concern];
+    where.concerns = { hasSome: values.map(String) };
   }
 
   if (minPrice || maxPrice) {
@@ -378,6 +410,8 @@ export async function getAllProductsAdmin(req: Request, res: Response) {
     where.OR = [
       { name: { contains: q, mode: 'insensitive' } },
       { sku: { contains: q, mode: 'insensitive' } },
+      { barcodes: { some: { value: { contains: q } } } },
+      { variants: { some: { barcodes: { some: { value: { contains: q } } } } } },
       { description: { contains: q, mode: 'insensitive' } },
     ];
   }
@@ -399,6 +433,8 @@ export async function getAllProductsAdmin(req: Request, res: Response) {
         category: { select: { id: true, name: true, slug: true } },
         images: { take: 1, orderBy: { sortOrder: 'asc' } },
         _count: { select: { variants: true, reviews: true, orderItems: true } },
+        variants: { include: { barcodes: true } },
+        barcodes: true,
       },
     }),
     prisma.product.count({ where }),
@@ -431,7 +467,8 @@ export async function getProductByIdAdmin(req: Request, res: Response) {
       brand: { select: { id: true, name: true } },
       category: { select: { id: true, name: true } },
       images: { orderBy: { sortOrder: 'asc' } },
-      variants: { orderBy: { name: 'asc' } },
+      variants: { orderBy: { name: 'asc' }, include: { barcodes: true } },
+      barcodes: true,
     },
   });
 
@@ -452,7 +489,7 @@ export async function createProduct(req: AuthRequest, res: Response) {
   } = req.body;
 
   if (!name?.trim()) throw new AppError('name is required', 400);
-  if (!price) throw new AppError('price is required', 400);
+  if (price === undefined || price === null || price === '') throw new AppError('price is required', 400);
   if (!sku?.trim()) throw new AppError('sku is required', 400);
   if (!categoryId) throw new AppError('categoryId is required', 400);
   if (!brandId) throw new AppError('brandId is required', 400);
@@ -483,6 +520,7 @@ export async function createProduct(req: AuthRequest, res: Response) {
       comparePrice: comparePrice ? parseFloat(comparePrice) : null,
       costPrice: costPrice ? parseFloat(costPrice) : null,
       sku: sku.trim(),
+      barcodes: { create: barcodeAssignments(req.body.barcodes ?? []) },
       stock: parseInt(stock as string) || 0,
       trackStock: trackStock ?? false,
       weight: weight ? parseFloat(weight) : null,
@@ -493,18 +531,19 @@ export async function createProduct(req: AuthRequest, res: Response) {
       categoryId,
       brandId,
       images: {
-        create: (images ?? []).map((img: any, i: number) => ({
+        create: (images ?? []).map((img: ProductImageInput, i: number) => ({
           url: img.url,
           alt: img.alt?.trim() || null,
           sortOrder: img.sortOrder ?? i,
         })),
       },
       variants: {
-        create: (variants ?? []).map((v: any) => ({
+        create: (variants ?? []).map((v: ProductVariantInput) => ({
+          barcodes: { create: barcodeAssignments(v.barcodes ?? []) },
           name: v.name?.trim() || 'Default',
-          price: parseFloat(v.price) || parseFloat(price),
-          stock: parseInt(v.stock as string) || 0,
-          options: v.options ?? null,
+          price: parseNumberInput(v.price, parseFloat(price)),
+          stock: parseNumberInput(v.stock, 0),
+          options: v.options ?? Prisma.JsonNull,
         })),
       },
     },
@@ -521,7 +560,7 @@ export async function createProduct(req: AuthRequest, res: Response) {
 
 /**
  * PUT /api/products/admin/:id
- * Update a product. Replaces images and variants wholesale.
+ * Update a product while preserving variant identities and references.
  */
 export async function updateProduct(req: AuthRequest, res: Response) {
   const { id } = req.params;
@@ -586,11 +625,15 @@ export async function updateProduct(req: AuthRequest, res: Response) {
   if (categoryId) data.category = { connect: { id: categoryId } };
   if (brandId) data.brand = { connect: { id: brandId } };
 
-  // Replace images if provided
+  const product = await prisma.$transaction(async (tx) => {
+  if (req.body.barcodes !== undefined) {
+    data.barcodes = { deleteMany: {}, create: barcodeAssignments(req.body.barcodes) };
+  }
+  // Replace images and update variants in the same transaction as the product.
   if (Array.isArray(images)) {
-    await prisma.productImage.deleteMany({ where: { productId: id } });
+    await tx.productImage.deleteMany({ where: { productId: id } });
     data.images = {
-      create: images.map((img: any, i: number) => ({
+      create: images.map((img: ProductImageInput, i: number) => ({
         url: img.url,
         alt: img.alt?.trim() || null,
         sortOrder: img.sortOrder ?? i,
@@ -598,28 +641,49 @@ export async function updateProduct(req: AuthRequest, res: Response) {
     };
   }
 
-  // Replace variants if provided
   if (Array.isArray(variants)) {
-    await prisma.productVariant.deleteMany({ where: { productId: id } });
+    const inputs = variants as ProductVariantInput[];
+    const retained = inputs.flatMap((v) => v.id ? [v.id] : []);
+    const owned = await tx.productVariant.count({ where: { productId: id, id: { in: retained } } });
+    if (owned !== retained.length || new Set(retained).size !== retained.length) {
+      throw new AppError('Invalid or duplicate variant ID', 400);
+    }
+    const removed = { productId: id, id: { notIn: retained } };
+    const referenced = await tx.productVariant.count({ where: { ...removed, OR: [
+      { orderItems: { some: {} } }, { cartItems: { some: {} } },
+    ] } });
+    if (referenced) throw new AppError('A variant used in a cart or order cannot be removed. Keep it to preserve its history.', 409);
+    await tx.productVariant.deleteMany({ where: removed });
+    const variantData = (v: ProductVariantInput) => ({
+      name: v.name?.trim() || 'Default',
+      price: parseNumberInput(v.price, Number(price ?? existing.price)),
+      stock: parseNumberInput(v.stock, 0),
+      options: v.options ?? Prisma.JsonNull,
+    });
     data.variants = {
-      create: variants.map((v: any) => ({
-        name: v.name?.trim() || 'Default',
-        price: parseFloat(v.price) || parseFloat(price ?? existing.price.toString()),
-        stock: parseInt(v.stock as string) || 0,
-        options: v.options ?? null,
+      create: inputs.filter((v) => !v.id).map((v) => ({
+        ...variantData(v), barcodes: { create: barcodeAssignments(v.barcodes ?? []) },
+      })),
+      update: inputs.filter((v) => v.id).map((v) => ({
+        where: { id: v.id! },
+        data: { ...variantData(v), ...(v.barcodes !== undefined ? {
+          barcodes: { deleteMany: {}, create: barcodeAssignments(v.barcodes) },
+        } : {}) },
       })),
     };
   }
 
-  const product = await prisma.product.update({
+  return tx.product.update({
     where: { id },
     data,
     include: {
       brand: { select: { id: true, name: true } },
       category: { select: { id: true, name: true } },
       images: { orderBy: { sortOrder: 'asc' } },
-      variants: true,
+      variants: { include: { barcodes: true } },
+      barcodes: true,
     },
+  });
   });
 
   res.json({ status: 'success', data: { product } });

@@ -1,6 +1,7 @@
 'use client';
 
-import { useRef, useState, useMemo } from 'react';
+import { useRef, useState, useMemo, useEffect } from 'react';
+import BarcodeEditor, { BarcodeValue } from '@/components/barcode/BarcodeEditor';
 import Image from 'next/image';
 import {
   Plus, Trash2, Pencil, Loader2, Package, Search,
@@ -24,6 +25,7 @@ interface ProductImage {
 
 interface ProductVariant {
   id?: string;
+  barcodes?: BarcodeValue[];
   name: string;
   price: string;
   stock: string;
@@ -50,13 +52,14 @@ interface ProductListItem {
 }
 
 interface ProductFull extends ProductListItem {
+  barcodes?: BarcodeValue[];
   description: string;
   shortDesc: string | null;
   weight: number | null;
   skinTypes: string[];
   concerns: string[];
   images: ProductImage[];
-  variants: { id: string; name: string; price: string; stock: number; options: any }[];
+  variants: { id: string; name: string; price: string; stock: number; options: any; barcodes?: BarcodeValue[] }[];
 }
 
 interface Category { id: string; name: string; parent?: { id: string; name: string } | null; }
@@ -107,6 +110,16 @@ function ProductFormModal({
   const [name, setName] = useState(initial?.name ?? '');
   const [slug, setSlug] = useState(initial?.slug ?? '');
   const [sku, setSku] = useState(initial?.sku ?? '');
+  const busyBarcodes = useRef(new Set<string>());
+  const [barcodeBusy, setBarcodeBusy] = useState(false);
+  const markBarcodeBusy = (key: string, busy: boolean) => {
+    if (busy) busyBarcodes.current.add(key); else busyBarcodes.current.delete(key);
+    setBarcodeBusy(busyBarcodes.current.size > 0);
+  };
+  const [barcodes, setBarcodes] = useState<BarcodeValue[]>(() => initial?.barcodes ?? (
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('barcode')
+      ? [{ value: new URLSearchParams(window.location.search).get('barcode')!, format: new URLSearchParams(window.location.search).get('format') || undefined }] : []
+  ));
   const [description, setDescription] = useState(initial?.description ?? '');
   const [shortDesc, setShortDesc] = useState(initial?.shortDesc ?? '');
   const [price, setPrice] = useState(initial?.price?.toString() ?? '');
@@ -135,6 +148,7 @@ function ProductFormModal({
   const [variants, setVariants] = useState<ProductVariant[]>(
     initial?.variants?.map((v) => ({
       id: v.id,
+      barcodes: v.barcodes ?? [],
       name: v.name,
       price: v.price.toString(),
       stock: v.stock.toString(),
@@ -208,6 +222,7 @@ function ProductFormModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (busyBarcodes.current.size) { setError('Wait for barcode lookup to finish before saving.'); return; }
     if (!name.trim()) { setError('Name is required'); return; }
     if (!sku.trim()) { setError('SKU is required'); return; }
     if (!price || parseFloat(price) < 0) { setError('Valid price is required'); return; }
@@ -219,9 +234,10 @@ function ProductFormModal({
       name, slug: slug || slugify(name), sku: sku.trim(), description, shortDesc: shortDesc || null,
       price, comparePrice: comparePrice || null, costPrice: costPrice || null, stock, trackStock, weight: weight || null,
       isActive, isFeatured, categoryId, brandId, skinTypes, concerns,
+      barcodes,
       images: images.map((img, i) => ({ url: img.url, alt: img.alt || '', sortOrder: i })),
       variants: variants.filter((v) => v.name.trim()).map((v) => ({
-        name: v.name, price: v.price, stock: v.stock, options: v.options || null,
+        id: v.id, name: v.name, price: v.price, stock: v.stock, options: v.options || null, barcodes: v.barcodes ?? [],
       })),
     });
   };
@@ -264,6 +280,7 @@ function ProductFormModal({
           </section>
 
           {/* Description */}
+          <BarcodeEditor value={barcodes} onChange={setBarcodes} productId={initial?.id} name={name || 'Product'} onBusyChange={(busy) => markBarcodeBusy('product', busy)} />
           <section>
             <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Description</h3>
             <div className="space-y-4">
@@ -457,13 +474,14 @@ function ProductFormModal({
               <div className="space-y-3">
                 {variants.map((v, idx) => (
                   <div key={idx} className="flex items-start gap-3 rounded-2xl border border-blush-100 bg-blush-50/50 p-3">
-                    <div className="flex-1 grid grid-cols-3 gap-2">
+                    <div className="min-w-0 flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <input value={v.name} onChange={(e) => updateVariant(idx, 'name', e.target.value)}
                         className="input-field text-sm" placeholder="Variant name" />
                       <input type="number" step="0.01" min="0" value={v.price} onChange={(e) => updateVariant(idx, 'price', e.target.value)}
                         className="input-field text-sm" placeholder="Price" />
                       <input type="number" min="0" value={v.stock} onChange={(e) => updateVariant(idx, 'stock', e.target.value)}
                         className="input-field text-sm" placeholder="Stock" />
+                      <div className="sm:col-span-3"><BarcodeEditor value={v.barcodes ?? []} onChange={(codes) => setVariants((current) => current.map((entry, at) => at === idx ? { ...entry, barcodes: codes } : entry))} productId={initial?.id} variantId={v.id} isVariant name={`${name} ${v.name}`} onBusyChange={(busy) => markBarcodeBusy(`variant-${idx}`, busy)} /></div>
                     </div>
                     <button type="button" onClick={() => removeVariant(idx)}
                       className="p-2 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors shrink-0">
@@ -492,7 +510,7 @@ function ProductFormModal({
           {/* Actions */}
           <div className="flex justify-end gap-3 pt-4 border-t border-blush-100">
             <button type="button" onClick={onClose} className="btn-secondary px-5 py-2.5 text-sm">Cancel</button>
-            <button type="submit" disabled={saveMutation.isPending}
+            <button type="submit" disabled={saveMutation.isPending || barcodeBusy}
               className="btn-primary px-5 py-2.5 text-sm">
               {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {saveMutation.isPending ? 'Saving...' : 'Save Product'}
@@ -684,6 +702,15 @@ export default function AdminProductsPage() {
   const queryClient = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState<ProductFull | null>(null);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const edit = params.get('edit');
+    if (edit) {
+      api.get(`/products/admin/${encodeURIComponent(edit)}`).then((response) => {
+        setEditProduct(response.data.data.product); setShowForm(true);
+      }).catch(() => toast.error('Unable to open this product'));
+    } else if (params.get('barcode')) setShowForm(true);
+  }, []);
   const [deleteProduct, setDeleteProduct] = useState<ProductListItem | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);

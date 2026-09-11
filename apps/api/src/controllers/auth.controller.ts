@@ -50,7 +50,7 @@ export async function register(req: Request, res: Response) {
 
   res.status(201).json({
     status: 'success',
-    data: { user, token },
+    data: { user },
   });
 }
 
@@ -82,7 +82,6 @@ export async function login(req: Request, res: Response) {
         phone: user.phone,
         role: user.role,
       },
-      token,
     },
   });
 }
@@ -128,4 +127,135 @@ export async function updateProfile(req: AuthRequest, res: Response) {
   });
 
   res.json({ status: 'success', data: { user } });
+}
+
+export async function getAddresses(req: AuthRequest, res: Response) {
+  const addresses = await prisma.address.findMany({
+    where: { userId: req.user!.id },
+    orderBy: [{ isDefault: 'desc' }, { id: 'asc' }],
+  });
+
+  res.json({ status: 'success', data: { addresses } });
+}
+
+export async function createAddress(req: AuthRequest, res: Response) {
+  const userId = req.user!.id;
+  const { name, phone, street, city, province, isDefault = false } = req.body;
+
+  const address = await prisma.$transaction(async (tx) => {
+    const existingCount = await tx.address.count({ where: { userId } });
+    const makeDefault = Boolean(isDefault) || existingCount === 0;
+
+    if (makeDefault) {
+      await tx.address.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      });
+    }
+
+    return tx.address.create({
+      data: {
+        userId,
+        name,
+        phone,
+        street,
+        city,
+        province,
+        isDefault: makeDefault,
+      },
+    });
+  });
+
+  res.status(201).json({ status: 'success', data: { address } });
+}
+
+export async function updateAddress(req: AuthRequest, res: Response) {
+  const userId = req.user!.id;
+  const { id } = req.params;
+  const { name, phone, street, city, province, isDefault } = req.body;
+
+  const existing = await prisma.address.findFirst({ where: { id, userId } });
+  if (!existing) {
+    throw new AppError('Address not found', 404);
+  }
+
+  const address = await prisma.$transaction(async (tx) => {
+    if (isDefault === true) {
+      await tx.address.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      });
+    }
+
+    const addressCount = await tx.address.count({ where: { userId } });
+    const nextIsDefault = addressCount === 1 ? true : isDefault;
+
+    return tx.address.update({
+      where: { id },
+      data: {
+        ...(name !== undefined ? { name } : {}),
+        ...(phone !== undefined ? { phone } : {}),
+        ...(street !== undefined ? { street } : {}),
+        ...(city !== undefined ? { city } : {}),
+        ...(province !== undefined ? { province } : {}),
+        ...(nextIsDefault !== undefined ? { isDefault: nextIsDefault } : {}),
+      },
+    });
+  });
+
+  res.json({ status: 'success', data: { address } });
+}
+
+export async function setDefaultAddress(req: AuthRequest, res: Response) {
+  const userId = req.user!.id;
+  const { id } = req.params;
+
+  const existing = await prisma.address.findFirst({ where: { id, userId } });
+  if (!existing) {
+    throw new AppError('Address not found', 404);
+  }
+
+  const address = await prisma.$transaction(async (tx) => {
+    await tx.address.updateMany({
+      where: { userId },
+      data: { isDefault: false },
+    });
+
+    return tx.address.update({
+      where: { id },
+      data: { isDefault: true },
+    });
+  });
+
+  res.json({ status: 'success', data: { address } });
+}
+
+export async function deleteAddress(req: AuthRequest, res: Response) {
+  const userId = req.user!.id;
+  const { id } = req.params;
+
+  const existing = await prisma.address.findFirst({ where: { id, userId } });
+  if (!existing) {
+    throw new AppError('Address not found', 404);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.address.delete({ where: { id } });
+
+    if (existing.isDefault) {
+      const nextDefault = await tx.address.findFirst({
+        where: { userId },
+        orderBy: { id: 'asc' },
+      });
+
+      if (nextDefault) {
+        await tx.address.update({
+          where: { id: nextDefault.id },
+          data: { isDefault: true },
+        });
+      }
+    }
+  });
+
+  res.json({ status: 'success', message: 'Address deleted' });
 }

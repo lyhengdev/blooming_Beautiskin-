@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { body } from 'express-validator';
+import { body, header } from 'express-validator';
 import { validate } from '../middlewares/validate';
 import { asyncHandler } from '../middlewares/asyncHandler';
 import * as orderController from '../controllers/order.controller';
@@ -12,7 +12,19 @@ router.use('/admin', authenticate, authorize('ADMIN', 'SUPER_ADMIN'));
 
 router.get('/admin/stats', asyncHandler(orderController.getOrderStats));
 router.get('/admin', asyncHandler(orderController.getAllOrdersAdmin));
-router.post('/admin/create', asyncHandler(orderController.createOrderAdmin));
+router.post('/admin/create', [
+  ...['shippingName', 'shippingPhone', 'shippingAddress', 'shippingCity', 'shippingProvince'].map((field) => body(field).isString().trim().notEmpty().isLength({ max: 500 })),
+  body('userId').optional().isString().notEmpty(),
+  body('paymentMethod').optional().isIn(['ABA_PAY', 'WING', 'CREDIT_CARD', 'CASH_ON_DELIVERY']),
+  body('deliveryFee').optional().isFloat({ min: 0, max: 999999 }).toFloat(),
+  body('items').isArray({ min: 1, max: 200 }),
+  body('items.*.productId').isString().notEmpty(),
+  body('items.*.variantId').optional().isString().notEmpty(),
+  body('items.*.quantity').isInt({ min: 1, max: 99999 }).toInt(),
+  body('items.*.overridePrice').optional({ nullable: true }).isFloat({ min: 0, max: 999999 }).toFloat(),
+  body('items.*.expectedPrice').optional().isFloat({ min: 0, max: 999999 }).toFloat(),
+  header('Idempotency-Key').optional().isUUID(),
+], validate, asyncHandler(orderController.createOrderAdmin));
 router.get('/admin/:id', asyncHandler(orderController.getOrderByIdAdmin));
 
 router.patch(

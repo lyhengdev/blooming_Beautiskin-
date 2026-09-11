@@ -9,10 +9,22 @@ import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { useAuthStore } from '@/stores/authStore';
 
+function getSafeReturnTo(value: string | null): string {
+  if (!value) return '/dashboard';
+
+  try {
+    const decoded = decodeURIComponent(value);
+    if (!decoded.startsWith('/') || decoded.startsWith('//')) return '/dashboard';
+    return decoded;
+  } catch {
+    return '/dashboard';
+  }
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnTo = searchParams.get('returnTo') || '/dashboard';
+  const returnTo = getSafeReturnTo(searchParams.get('returnTo'));
   const { login, isLoading } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -23,7 +35,7 @@ function LoginForm() {
     setError('');
     try {
       await login(formData.email, formData.password);
-      router.push(decodeURIComponent(returnTo));
+      router.push(returnTo);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Invalid email or password');
     }

@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { sendInvoice } from '../lib/telegram';
-import { Prisma } from '@prisma/client';
+import { OrderStatus, Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { phoneMatches, isPhoneLikeQuery } from '../lib/phone';
@@ -21,10 +21,16 @@ export async function getAllOrders(req: Request, res: Response) {
   const limitNum = parseInt(limit as string);
   const skip = (pageNum - 1) * limitNum;
 
-  const where: any = {};
+  const where: Prisma.OrderWhereInput = {};
 
   if (status) {
-    where.status = status as string;
+    if (typeof status !== 'string' || !VALID_STATUSES.includes(status as OrderStatus)) {
+      throw new AppError(
+        `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`,
+        400,
+      );
+    }
+    where.status = status as OrderStatus;
   }
 
   if (search) {
@@ -96,13 +102,14 @@ export async function updateOrderStatus(req: Request, res: Response) {
   const { id } = req.params;
   const { status } = req.body;
 
-  if (!VALID_STATUSES.includes(status as any)) {
+  if (typeof status !== 'string' || !VALID_STATUSES.includes(status as OrderStatus)) {
     throw new AppError(
       `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}`,
       400,
     );
   }
 
+  const nextStatus = status as OrderStatus;
   const order = await prisma.order.findUnique({ where: { id } });
   if (!order) {
     throw new AppError('Order not found', 404);
@@ -110,7 +117,7 @@ export async function updateOrderStatus(req: Request, res: Response) {
 
   const updated = await prisma.order.update({
     where: { id },
-    data: { status: status as any },
+    data: { status: nextStatus },
     include: {
       items: {
         include: {
@@ -122,7 +129,7 @@ export async function updateOrderStatus(req: Request, res: Response) {
   });
 
   // Update payment status when order is confirmed
-  if (status === 'CONFIRMED' && updated.payment) {
+  if (nextStatus === 'CONFIRMED' && updated.payment) {
     await prisma.payment.update({
       where: { orderId: id },
       data: { status: 'COMPLETED', paidAt: new Date() },
@@ -154,7 +161,6 @@ export async function sendOrderInvoice(req: Request, res: Response) {
 export async function getDashboardStats(_req: Request, res: Response) {
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const [
     totalOrders,
@@ -359,11 +365,6 @@ export async function getProfitStats(_req: Request, res: Response) {
       margin,
     };
   });
-
-  // Per-product inventory value (stock * costPrice)
-  const inventoryValue = allProducts.reduce((sum, p) => {
-    return sum + (p.costPrice ? Number(p.costPrice) : 0);
-  }, 0);
 
   res.json({
     status: 'success',
