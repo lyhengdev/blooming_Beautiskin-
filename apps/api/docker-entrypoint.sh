@@ -4,6 +4,17 @@ set -e
 echo "[entrypoint] Blooming Beauty Skin API — starting up"
 echo "[entrypoint] NODE_ENV=${NODE_ENV:-production}"
 
+# ── 0. Normalize DATABASE_URL for Neon (add connect_timeout if missing) ────
+# Neon's pooled endpoint can be slow to establish on first connect (cold start).
+# Without connect_timeout, Prisma's migration advisory lock aborts after 10s.
+case "${DATABASE_URL}" in
+  *connect_timeout*) DATABASE_URL="${DATABASE_URL}" ;;
+  *\?*)               DATABASE_URL="${DATABASE_URL}&connect_timeout=30" ;;
+  *)                  DATABASE_URL="${DATABASE_URL}?connect_timeout=30" ;;
+esac
+export DATABASE_URL
+echo "[entrypoint] DATABASE_URL normalized (connect_timeout=30)."
+
 # ── 1. Apply schema (migrations if available, else db push) ────────────────
 # Render can't run manual commands, so we do it here on every boot.
 # - If the DB already has a migration history, apply pending migrations.
@@ -21,8 +32,22 @@ if [ "${SKIP_MIGRATIONS}" != "true" ]; then
 
   if [ "${MIGRATIONS_TABLE}" = "yes" ]; then
     echo "[entrypoint] Migration history found — applying migrations..."
-    ( cd /app/apps/api && ./node_modules/.bin/prisma migrate deploy ) \
-      || { echo "[entrypoint] ERROR: migrations failed"; exit 1; }
+    # Retry up to 3 times: Neon cold-start can exceed Prisma's 10s advisory-lock
+    # window on the very first attempt after a deploy.
+    MIGRATE_OK=0
+    for attempt in 1 2 3; do
+      echo "[entrypoint] migrate deploy (attempt ${attempt}/3)..."
+      if ( cd /app/apps/api && ./node_modules/.bin/prisma migrate deploy ); then
+        MIGRATE_OK=1
+        break
+      fi
+      echo "[entrypoint] migrate deploy failed — retrying in 5s..."
+      sleep 5
+    done
+    if [ "${MIGRATE_OK}" != "1" ]; then
+      echo "[entrypoint] ERROR: migrations failed after 3 attempts"
+      exit 1
+    fi
   else
     echo "[entrypoint] No migration history (existing schema DB) — syncing via prisma db push..."
     ( cd /app/apps/api && ./node_modules/.bin/prisma db push --skip-generate ) \
