@@ -26,6 +26,12 @@ RUN pnpm --filter=api build
 WORKDIR /app/apps/web
 ARG NEXT_PUBLIC_API_URL=/api
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Cloudinary upload config is NEXT_PUBLIC_* so it must be present at build
+# time (Next inlines it into the browser bundle). Pass as build args / env.
+ARG NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=
+ENV NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=$NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+ARG NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=
+ENV NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=$NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET
 RUN pnpm --filter=web build
 
 # ── Runtime stage ────────────────────────────────────────────────────────────
