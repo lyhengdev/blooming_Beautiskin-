@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { useCartStore } from '@/stores/cartStore';
+import { getDeliveryFee, FREE_SHIPPING_THRESHOLD, FREE_SHIPPING_PROMPT } from '@/lib/delivery';
 import api from '@/lib/api';
 
 export default function CartPage() {
@@ -21,7 +22,7 @@ export default function CartPage() {
     fetchCart();
   }, [fetchCart]);
 
-  const shipping = subtotal >= 30 ? 0 : 3;
+  const shipping = getDeliveryFee(subtotal);
   const total = subtotal + shipping - discount;
 
   const applyCoupon = async () => {
@@ -164,11 +165,11 @@ export default function CartPage() {
                   </div>
                 </div>
 
-                {subtotal < 30 && subtotal > 0 && (
+                {subtotal < FREE_SHIPPING_THRESHOLD && subtotal > 0 && (
                   <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                    <p className="text-xs text-green-700">Add ${(30 - subtotal).toFixed(2)} more for free shipping!</p>
+                    <p className="text-xs text-green-700">{FREE_SHIPPING_PROMPT(FREE_SHIPPING_THRESHOLD - subtotal)}</p>
                     <div className="mt-2 bg-green-100 rounded-full h-2">
-                      <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${Math.min(100, (subtotal / 30) * 100)}%` }} />
+                      <div className="bg-green-500 h-2 rounded-full transition-all" style={{ width: `${Math.min(100, (subtotal / FREE_SHIPPING_THRESHOLD) * 100)}%` }} />
                     </div>
                   </div>
                 )}
@@ -192,7 +193,7 @@ export default function CartPage() {
                   Proceed to Checkout
                 </Link>
                 <p className="text-xs text-gray-400 text-center mt-3">
-                  Secure checkout with ABA Pay, Wing, Visa, or Cash on Delivery
+                  Secure checkout with Cash on Delivery, ABA Pay, or Wing Money
                 </p>
               </div>
             </div>
@@ -207,8 +208,8 @@ export default function CartPage() {
             <div className="min-w-0">
               <p className="text-[11px] text-gray-400 font-medium">Total</p>
               <p className="font-extrabold text-primary-600 text-lg leading-tight">${total.toFixed(2)}</p>
-              {subtotal < 30 && (
-                <p className="text-[10px] text-primary-700 font-medium">Add ${(30 - subtotal).toFixed(2)} for free shipping</p>
+              {subtotal < FREE_SHIPPING_THRESHOLD && (
+                <p className="text-[10px] text-primary-700 font-medium">Add ${(FREE_SHIPPING_THRESHOLD - subtotal).toFixed(2)} for free shipping</p>
               )}
             </div>
             <Link href="/checkout" className="flex-1 btn-primary text-center py-3 text-sm">

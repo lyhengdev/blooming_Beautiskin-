@@ -3,7 +3,9 @@ import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
 const ADMIN_ROUTES = ['/admin'];
-const PROTECTED_ROUTES = ['/dashboard', '/checkout'];
+// /checkout is intentionally public so guests can complete an order. Orders
+// themselves are protected server-side (optionalAuth + session cart lookup).
+const PROTECTED_ROUTES = ['/dashboard'];
 // If already logged in, visiting these pages should redirect to dashboard
 const AUTH_ROUTES = ['/login', '/register'];
 

@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Package } from 'lucide-react';
+import { ArrowRight, CheckCircle2, MinusCircle, Package } from 'lucide-react';
 import { cn, formatPrice } from '@/lib/utils';
 
 export interface StorefrontProductCardProduct {
@@ -16,6 +16,8 @@ export interface StorefrontProductCardProduct {
   images?: { url: string; alt?: string | null }[];
   avgRating?: number;
   reviewCount?: number;
+  stock?: number | null;
+  trackStock?: boolean;
 }
 
 interface ProductCardProps {
@@ -33,6 +35,10 @@ export default function ProductCard({
 }: ProductCardProps) {
   const image = product.images?.[0];
   const isList = view === 'list';
+  const tracksStock = product.trackStock === true;
+  const stockNum = Number(product.stock ?? 0);
+  const isOutOfStock = tracksStock && stockNum <= 0;
+  const isLowStock = tracksStock && !isOutOfStock && stockNum > 0 && stockNum <= 5;
 
   return (
     <Link
@@ -54,8 +60,23 @@ export default function ProductCard({
             className="object-cover transition-transform duration-300 group-hover:scale-105"
             unoptimized
           />
-        ) : (
-          <Package className="h-10 w-10 text-primary-200 opacity-70" />
+  ) : (
+    <Package className="h-10 w-10 text-primary-200 opacity-70" />
+  )}
+        {product.trackStock === true && product.stock !== undefined && (
+          <div
+            className={cn(
+              'absolute left-0 right-0 top-0 flex items-center justify-center gap-1 px-2 py-1 text-[10px] font-bold uppercase tracking-wide',
+              isOutOfStock ? 'bg-red-600 text-white' : 'bg-primary-500/90 text-white',
+            )}
+          >
+            {isOutOfStock ? (
+              <MinusCircle className="h-3 w-3" />
+            ) : (
+              <CheckCircle2 className="h-3 w-3" />
+            )}
+            {isOutOfStock ? 'Out of stock' : isLowStock ? `${product.stock} left` : 'In stock'}
+          </div>
         )}
       </div>
       <div className="flex flex-1 flex-col p-4">

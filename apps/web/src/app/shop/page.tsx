@@ -28,6 +28,8 @@ interface Product {
   images: { url: string; alt: string | null }[];
   avgRating: number;
   reviewCount: number;
+  stock: number | null;
+  trackStock: boolean;
 }
 
 interface Category {

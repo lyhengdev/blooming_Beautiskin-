@@ -55,6 +55,8 @@ interface ProductFull extends ProductListItem {
   barcodes?: BarcodeValue[];
   description: string;
   shortDesc: string | null;
+  ingredients: string | null;
+  usage: string | null;
   weight: number | null;
   skinTypes: string[];
   concerns: string[];
@@ -122,6 +124,8 @@ function ProductFormModal({
   ));
   const [description, setDescription] = useState(initial?.description ?? '');
   const [shortDesc, setShortDesc] = useState(initial?.shortDesc ?? '');
+  const [ingredients, setIngredients] = useState(initial?.ingredients ?? '');
+  const [usageDetails, setUsageDetails] = useState(initial?.usage ?? '');
   const [price, setPrice] = useState(initial?.price?.toString() ?? '');
   const [comparePrice, setComparePrice] = useState(initial?.comparePrice?.toString() ?? '');
   const [costPrice, setCostPrice] = useState(initial?.costPrice?.toString() ?? '');
@@ -234,6 +238,7 @@ function ProductFormModal({
       name, slug: slug || slugify(name), sku: sku.trim(), description, shortDesc: shortDesc || null,
       price, comparePrice: comparePrice || null, costPrice: costPrice || null, stock, trackStock, weight: weight || null,
       isActive, isFeatured, categoryId, brandId, skinTypes, concerns,
+      ingredients: ingredients || null, usage: usageDetails || null,
       barcodes,
       images: images.map((img, i) => ({ url: img.url, alt: img.alt || '', sortOrder: i })),
       variants: variants.filter((v) => v.name.trim()).map((v) => ({
@@ -291,6 +296,14 @@ function ProductFormModal({
               <div>
                 <label className="block text-xs font-bold text-gray-600 mb-1">Full Description</label>
                 <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} className="input-field w-full resize-none" placeholder="Detailed product description..." />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Ingredients</label>
+                <textarea value={ingredients} onChange={(e) => setIngredients(e.target.value)} rows={5} className="input-field w-full resize-none" placeholder="Full list of ingredients, e.g. Niacinamide, Hyaluronic Acid, Vitamin E..." />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-600 mb-1">Usage / How to Use</label>
+                <textarea value={usageDetails} onChange={(e) => setUsageDetails(e.target.value)} rows={4} className="input-field w-full resize-none" placeholder="Steps for using the product..." />
               </div>
             </div>
           </section>

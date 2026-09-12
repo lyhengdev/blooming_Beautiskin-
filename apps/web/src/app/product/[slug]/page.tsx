@@ -19,6 +19,8 @@ interface Product {
   slug: string;
   description: string | null;
   shortDesc: string | null;
+  ingredients: string | null;
+  usage: string | null;
   price: string;
   comparePrice: string | null;
   stock: number;
@@ -350,6 +352,18 @@ export default function ProductDetailPage() {
                     ) : (
                       <p className="text-sm text-gray-400">No description available for this product yet.</p>
                     )
+                  )}
+                  {activeTab === 'description' && product.ingredients && (
+                    <div className="mt-6">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Ingredients</h4>
+                      <div className="text-sm text-gray-600 whitespace-pre-line">{product.ingredients}</div>
+                    </div>
+                  )}
+                  {activeTab === 'description' && product.usage && (
+                    <div className="mt-6">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">How to Use</h4>
+                      <div className="text-sm text-gray-600 whitespace-pre-line">{product.usage}</div>
+                    </div>
                   )}
                   {activeTab === 'reviews' && (
                     <div className="space-y-6">

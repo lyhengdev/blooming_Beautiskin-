@@ -465,7 +465,7 @@ export async function getAllCustomers(req: Request, res: Response) {
   });
 
   const totalSpentMap = orderTotals.reduce((acc, row) => {
-    acc[row.userId] = Number(row._sum.total ?? 0);
+    if (row.userId) acc[row.userId] = Number(row._sum.total ?? 0);
     return acc;
   }, {} as Record<string, number>);
 

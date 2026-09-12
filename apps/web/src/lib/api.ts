@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getGuestSessionId } from './guestSession';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || '/api',
@@ -8,6 +9,16 @@ const api = axios.create({
   },
   // Required so the browser sends the httpOnly auth cookie on every request
   withCredentials: true,
+});
+
+api.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const sessionId = getGuestSessionId();
+    if (sessionId) {
+      config.headers.set('x-session-id', sessionId);
+    }
+  }
+  return config;
 });
 
 api.interceptors.response.use(

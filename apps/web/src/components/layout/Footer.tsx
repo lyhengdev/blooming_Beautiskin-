@@ -33,7 +33,7 @@ const deliveryInfo = [
   { icon: Phone, text: <>Order via Telegram or Facebook</> },
 ];
 
-const paymentMethods = ['Visa', 'Mastercard', 'ABA Pay', 'Wing', 'COD'];
+const paymentMethods = ['ABA Pay', 'Wing', 'COD'];
 
 export default function Footer() {
   return (

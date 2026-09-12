@@ -210,8 +210,8 @@ function OrderDetailModal({
               {/* Customer */}
               <div className="rounded-2xl border border-blush-100 p-4">
                 <p className="text-xs font-bold text-gray-500 mb-2 uppercase tracking-wider">Customer</p>
-                <p className="text-sm font-bold text-gray-900">{order.user.name}</p>
-                <p className="text-xs text-gray-500">{order.user.email}</p>
+                <p className="text-sm font-bold text-gray-900">{order.user?.name ?? order.shippingName}</p>
+                <p className="text-xs text-gray-500">{order.user?.email ?? 'Guest checkout'}</p>
               </div>
             </div>
 

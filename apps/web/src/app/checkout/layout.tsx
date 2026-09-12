@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Checkout',
-  description: 'Complete your order securely with ABA Pay, Wing, Visa, or Cash on Delivery.',
+  description: 'Complete your order securely with Cash on Delivery, ABA Pay, or Wing Money.',
 };
 
 export default function CheckoutLayout({ children }: { children: React.ReactNode }) {

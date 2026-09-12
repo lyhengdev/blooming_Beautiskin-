@@ -250,7 +250,14 @@ export async function getFeaturedProducts(_req: Request, res: Response) {
     orderBy: { createdAt: 'desc' },
   });
 
-  res.json({ status: 'success', data: { products } });
+  const productsWithMeta = products.map((p) => ({
+    ...p,
+    avgRating: calcAvgRating(p.reviews),
+    reviewCount: p.reviews.length,
+    reviews: undefined,
+  }));
+
+  res.json({ status: 'success', data: { products: productsWithMeta } });
 }
 
 export async function getBestsellers(_req: Request, res: Response) {
@@ -483,7 +490,8 @@ export async function getProductByIdAdmin(req: Request, res: Response) {
  */
 export async function createProduct(req: AuthRequest, res: Response) {
   const {
-    name, slug, description, shortDesc, price, comparePrice, costPrice,
+    name, slug, description, shortDesc, ingredients, usage,
+    price, comparePrice, costPrice,
     sku, stock, trackStock, weight, isActive, isFeatured,
     skinTypes, concerns, categoryId, brandId, images, variants,
   } = req.body;
@@ -516,6 +524,8 @@ export async function createProduct(req: AuthRequest, res: Response) {
       slug: finalSlug,
       description: description?.trim() || null,
       shortDesc: shortDesc?.trim() || null,
+      ingredients: ingredients?.trim() || null,
+      usage: usage?.trim() || null,
       price: parseFloat(price),
       comparePrice: comparePrice ? parseFloat(comparePrice) : null,
       costPrice: costPrice ? parseFloat(costPrice) : null,
@@ -565,7 +575,8 @@ export async function createProduct(req: AuthRequest, res: Response) {
 export async function updateProduct(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const {
-    name, slug, description, shortDesc, price, comparePrice, costPrice,
+    name, slug, description, shortDesc, ingredients, usage,
+    price, comparePrice, costPrice,
     sku, stock, trackStock, weight, isActive, isFeatured,
     skinTypes, concerns, categoryId, brandId, images, variants,
   } = req.body;
@@ -611,6 +622,8 @@ export async function updateProduct(req: AuthRequest, res: Response) {
   if (slug !== undefined || name !== undefined) data.slug = finalSlug;
   if (description !== undefined) data.description = description?.trim() || null;
   if (shortDesc !== undefined) data.shortDesc = shortDesc?.trim() || null;
+  if (ingredients !== undefined) data.ingredients = ingredients?.trim() || null;
+  if (usage !== undefined) data.usage = usage?.trim() || null;
   if (price !== undefined) data.price = parseFloat(price);
   if (comparePrice !== undefined) data.comparePrice = comparePrice ? parseFloat(comparePrice) : null;
   if (costPrice !== undefined) data.costPrice = costPrice ? parseFloat(costPrice) : null;

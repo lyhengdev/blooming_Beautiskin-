@@ -27,6 +27,8 @@ interface Product {
   comparePrice: string | null;
   brand: { name: string; slug: string };
   images: { url: string; alt: string | null }[];
+  avgRating: number;
+  reviewCount: number;
 }
 
 interface Brand {
@@ -209,7 +211,7 @@ export default function HomePage() {
                 href="/shop?sort=bestselling"
               />
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
-                {bestsellers.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+                {bestsellers.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} showRating />)}
               </div>
             </div>
           </section>
@@ -228,7 +230,7 @@ export default function HomePage() {
                 href="/shop?sort=newest"
               />
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
-                {newArrivals.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+                {newArrivals.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} showRating />)}
               </div>
             </div>
           </section>
@@ -247,7 +249,7 @@ export default function HomePage() {
                 href="/shop"
               />
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
-                {recommended.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+                {recommended.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} showRating />)}
               </div>
             </div>
           </section>
@@ -266,7 +268,7 @@ export default function HomePage() {
                 href="/shop"
               />
               <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-6">
-                {featured.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+                {featured.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} showRating />)}
               </div>
             </div>
           </section>

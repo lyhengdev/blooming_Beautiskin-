@@ -1,4 +1,5 @@
 import { randomBytes } from 'crypto';
+import { Request } from 'express';
 
 export function calcAvgRating(reviews: { rating: number }[]): number {
   if (reviews.length === 0) return 0;
@@ -37,4 +38,11 @@ export const FREE_SHIPPING_THRESHOLD = 30;
 export function calculateShipping(subtotal: number, province: string): number {
   if (subtotal >= FREE_SHIPPING_THRESHOLD) return 0;
   return province === 'Phnom Penh' ? 1 : 1.5;
+}
+
+// ── Guest session (used for guest carts + guest orders) ───────────────────────
+export function getGuestSessionId(req: Request): string | null {
+  const id = req.headers['x-session-id'] as string | undefined;
+  if (id && /^[0-9a-f-]{36}$/i.test(id)) return id;
+  return null;
 }

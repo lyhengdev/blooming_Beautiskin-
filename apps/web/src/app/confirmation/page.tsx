@@ -3,13 +3,21 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
-import { Check, Copy, ShoppingBag, Package } from 'lucide-react';
+import { Check, Copy, ShoppingBag, Package, Landmark, Wallet, Truck } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get('order');
+  const paymentMethod = searchParams.get('payment');
+
+  const paymentNotice =
+    paymentMethod === 'ABA_PAY'
+      ? { icon: Landmark, title: 'Pay with ABA Pay', text: 'We will contact you with our ABA payment details. Please complete your transfer to confirm your order.' }
+      : paymentMethod === 'WING'
+        ? { icon: Wallet, title: 'Pay with Wing Money', text: 'We will contact you with our Wing payment details. Please complete your transfer to confirm your order.' }
+        : null;
 
   const handleCopyOrder = () => {
     if (orderNumber) {
@@ -40,7 +48,16 @@ function ConfirmationContent() {
             </div>
           )}
 
-          <div className="mt-8 space-y-3">
+          <div className="mt-6 space-y-3">
+            {paymentNotice && (
+              <div className="p-4 bg-primary-50 rounded-lg text-left">
+                <div className="flex items-center gap-2 text-primary-700 font-semibold text-sm">
+                  <paymentNotice.icon className="h-5 w-5" />
+                  {paymentNotice.title}
+                </div>
+                <p className="text-sm text-gray-600 mt-1">{paymentNotice.text}</p>
+              </div>
+            )}
             <div className="flex items-center gap-3 text-sm text-gray-600 justify-center">
               <Package className="h-5 w-5 text-primary-600" />
               <span>Estimated delivery: 3-5 business days</span>
@@ -50,6 +67,9 @@ function ConfirmationContent() {
           <div className="flex flex-col sm:flex-row gap-3 mt-8 justify-center">
             <Link href="/shop" className="btn-primary flex items-center gap-2">
               <ShoppingBag className="h-4 w-4" /> Continue Shopping
+            </Link>
+            <Link href="/track" className="btn-secondary flex items-center gap-2">
+              <Truck className="h-4 w-4" /> Track Your Order
             </Link>
             <Link href="/dashboard?tab=orders" className="btn-secondary">View Orders</Link>
           </div>

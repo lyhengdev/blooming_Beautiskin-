@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middlewares/errorHandler';
 import { generateToken, AuthRequest } from '../middlewares/auth';
+import { getGuestSessionId } from '../utils/helpers';
 
 const COOKIE_NAME = 'token';
 const COOKIE_OPTIONS = {
@@ -16,7 +17,64 @@ const COOKIE_OPTIONS = {
   path: '/',
 };
 
-export async function register(req: Request, res: Response) {
+// Move items from the guest (session) cart into the user's cart after
+// login/register so nothing the visitor added is lost.
+async function mergeGuestCart(userId: string, sessionId: string | null): Promise<void> {
+  if (!sessionId) return;
+
+  const guestCart = await prisma.cart.findUnique({
+    where: { sessionId },
+    include: { items: { select: { id: true } } },
+  });
+  if (!guestCart || guestCart.items.length === 0) return;
+
+  const userCart = await prisma.cart.upsert({
+    where: { userId },
+    create: { userId },
+    update: {},
+  });
+
+  const guestItems = await prisma.cartItem.findMany({ where: { cartId: guestCart.id } });
+  for (const item of guestItems) {
+    const existing = await prisma.cartItem.findFirst({
+      where: { cartId: userCart.id, productId: item.productId, variantId: item.variantId },
+    });
+    if (existing) {
+      await prisma.cartItem.update({
+        where: { id: existing.id },
+        data: { quantity: existing.quantity + item.quantity },
+      });
+    } else {
+      await prisma.cartItem.create({
+        data: {
+          cartId: userCart.id,
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+        },
+      });
+    }
+  }
+
+  await prisma.cart.delete({ where: { id: guestCart.id } });
+}
+
+function getUserResponse(user: { id: string; name: string; email: string; phone: string | null; role: string }) {
+  return {
+    status: 'success',
+    data: {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+      },
+    },
+  };
+}
+
+export async function register(req: AuthRequest, res: Response) {
   const { name, email, password, phone } = req.body;
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -43,18 +101,17 @@ export async function register(req: Request, res: Response) {
     },
   });
 
+  await mergeGuestCart(user.id, getGuestSessionId(req));
+
   const token = generateToken(user);
 
   // Set httpOnly cookie so Next.js middleware can read it for route protection
   res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
 
-  res.status(201).json({
-    status: 'success',
-    data: { user },
-  });
+  res.status(201).json(getUserResponse(user));
 }
 
-export async function login(req: Request, res: Response) {
+export async function login(req: AuthRequest, res: Response) {
   const { email, password } = req.body;
 
   const user = await prisma.user.findUnique({ where: { email } });
@@ -67,23 +124,14 @@ export async function login(req: Request, res: Response) {
     throw new AppError('Invalid email or password', 401);
   }
 
+  await mergeGuestCart(user.id, getGuestSessionId(req));
+
   const token = generateToken(user);
 
   // Set httpOnly cookie so Next.js middleware can read it for route protection
   res.cookie(COOKIE_NAME, token, COOKIE_OPTIONS);
 
-  res.json({
-    status: 'success',
-    data: {
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-      },
-    },
-  });
+  res.json(getUserResponse(user));
 }
 
 export async function logout(_req: Request, res: Response) {

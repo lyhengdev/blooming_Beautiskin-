@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { AuthRequest } from '../middlewares/auth';
 import { AppError } from '../middlewares/errorHandler';
-import { generateOrderNumber, calculateShipping } from '../utils/helpers';
+import { generateOrderNumber, calculateShipping, getGuestSessionId } from '../utils/helpers';
 import { sendTelegramMessage, sendTelegramPhoto } from '../lib/telegram';
 import { renderInvoice } from '../lib/invoiceImage';
 import { OrderStatus, Prisma } from '@prisma/client';
@@ -17,7 +17,8 @@ interface AdminOrderItemInput {
 }
 
 export async function createOrder(req: AuthRequest, res: Response) {
-  const userId = req.user!.id;
+  const userId = req.user?.id ?? null;
+  const sessionId = getGuestSessionId(req);
   const {
     shippingName,
     shippingPhone,
@@ -28,8 +29,12 @@ export async function createOrder(req: AuthRequest, res: Response) {
     paymentMethod = 'CASH_ON_DELIVERY',
   } = req.body;
 
+  if (!userId && !sessionId) {
+    throw new AppError('No guest session id provided', 400);
+  }
+
   const cart = await prisma.cart.findFirst({
-    where: { userId },
+    where: userId ? { userId } : { sessionId },
     include: {
       items: {
         include: {
@@ -251,6 +256,31 @@ export async function getOrder(req: AuthRequest, res: Response) {
 
   if (!order) {
     throw new AppError('Order not found', 404);
+  }
+
+  res.json({ status: 'success', data: { order } });
+}
+
+// ── Guest order tracking ───────────────────────────────────────────────────────
+
+export async function trackOrder(req: AuthRequest, res: Response) {
+  const { orderNumber, phone } = req.body;
+
+  const order = await prisma.order.findFirst({
+    where: { orderNumber, shippingPhone: phone },
+    include: {
+      items: {
+        include: {
+          product: { select: { name: true, slug: true, images: true } },
+          variant: true,
+        },
+      },
+      payment: true,
+    },
+  });
+
+  if (!order) {
+    throw new AppError('Order not found. Check your order number and phone.', 404);
   }
 
   res.json({ status: 'success', data: { order } });

@@ -3,7 +3,7 @@ import { body, header } from 'express-validator';
 import { validate } from '../middlewares/validate';
 import { asyncHandler } from '../middlewares/asyncHandler';
 import * as orderController from '../controllers/order.controller';
-import { authenticate, authorize } from '../middlewares/auth';
+import { authenticate, authorize, optionalAuth } from '../middlewares/auth';
 
 const router = Router();
 
@@ -45,7 +45,7 @@ router.delete('/admin/:id', asyncHandler(orderController.deleteOrderAdmin));
 
 router.post(
   '/',
-  authenticate,
+  optionalAuth,
   [
     body('shippingName').trim().notEmpty().withMessage('Shipping name is required'),
     body('shippingPhone').trim().notEmpty().withMessage('Phone is required'),
@@ -58,6 +58,17 @@ router.post(
   ],
   validate,
   asyncHandler(orderController.createOrder)
+);
+
+// ── Guest order tracking (order number + phone, no login required) ────────────
+router.post(
+  '/track',
+  [
+    body('orderNumber').trim().notEmpty().withMessage('Order number is required'),
+    body('phone').trim().notEmpty().withMessage('Phone is required'),
+  ],
+  validate,
+  asyncHandler(orderController.trackOrder)
 );
 
 router.get('/', authenticate, asyncHandler(orderController.getUserOrders));

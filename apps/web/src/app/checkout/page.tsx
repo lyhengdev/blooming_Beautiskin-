@@ -4,25 +4,19 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Check, Package, LogIn, X, Banknote, Wallet, CreditCard, Landmark } from 'lucide-react';
+import { Check, Package, LogIn, X, Banknote, Wallet, Landmark } from 'lucide-react';
 import { toast } from 'sonner';
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
+import { getDeliveryFee } from '@/lib/delivery';
 import api from '@/lib/api';
 
 const PROVINCES = [
   'Phnom Penh', 'Battambang', 'Siem Reap', 'Sihanoukville', 'Kampot',
   'Kandal', 'Prey Veng', 'Kampong Cham', 'Kampong Speu', 'Koh Kong',
 ];
-
-const FREE_SHIPPING_THRESHOLD = 30;
-
-function getDeliveryFee(subtotal: number, province: string): number {
-  if (subtotal >= FREE_SHIPPING_THRESHOLD) return 0;
-  return province === 'Phnom Penh' ? 1 : 1.5;
-}
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -56,13 +50,6 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!user) {
-      toast.info('Please login to checkout', {
-        action: { label: 'Login', onClick: () => router.push('/login?returnTo=/checkout') },
-      });
-      return;
-    }
-
     if (step === 1) {
       setStep(2);
       return;
@@ -82,7 +69,7 @@ export default function CheckoutPage() {
       const orderNum = res.data.data.order.orderNumber;
       await clearCart();
       toast.success('Order placed successfully!');
-      router.push(`/confirmation?order=${orderNum}`);
+      router.push(`/confirmation?order=${orderNum}&payment=${paymentMethod}`);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to place order');
     } finally {
@@ -116,7 +103,7 @@ export default function CheckoutPage() {
             <div className="mb-6 sm:mb-8 p-3 sm:p-4 bg-primary-50 rounded-xl border border-primary-100">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div>
-                  <p className="font-medium text-gray-900">You need to log in to checkout</p>
+                  <p className="font-medium text-gray-900">You&rsquo;re checking out as a guest</p>
                   <p className="text-sm text-gray-600">Login for faster checkout and order tracking.</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -225,28 +212,32 @@ export default function CheckoutPage() {
                         <p className="font-medium mb-2">Payment Method</p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                           {[
-                            { value: 'CASH_ON_DELIVERY', label: 'Cash on Delivery', icon: Banknote },
-                            { value: 'ABA_PAY', label: 'ABA Pay', icon: Landmark },
-                            { value: 'WING', label: 'Wing Money', icon: Wallet },
-                            { value: 'CREDIT_CARD', label: 'Credit / Debit Card', icon: CreditCard },
+                            { value: 'CASH_ON_DELIVERY', label: 'Cash on Delivery', desc: 'Pay in cash when your order arrives', icon: Banknote },
+                            { value: 'ABA_PAY', label: 'ABA Pay (Bank Transfer)', desc: 'We&rsquo;ll send our ABA payment details for you to transfer', icon: Landmark },
+                            { value: 'WING', label: 'Wing Money (Bank Transfer)', desc: 'We&rsquo;ll send our Wing payment details for you to transfer', icon: Wallet },
                           ].map((opt) => (
                             <button
                               key={opt.value}
                               type="button"
                               onClick={() => setPaymentMethod(opt.value)}
-                              className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+                              className={`flex items-start gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors text-left ${
                                 paymentMethod === opt.value
                                   ? 'border-primary-600 bg-primary-50 text-primary-700'
                                   : 'border-gray-200 bg-white text-gray-600 hover:border-primary-300'
                               }`}
                             >
-                              <span className={`h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center ${
+                              <span className={`h-3.5 w-3.5 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0 ${
                                 paymentMethod === opt.value ? 'border-primary-600' : 'border-gray-300'
                               }`}>
                                 {paymentMethod === opt.value && <span className="h-1.5 w-1.5 rounded-full bg-primary-600" />}
                               </span>
-                              <opt.icon className="h-4 w-4 text-primary-500 shrink-0" />
-                              {opt.label}
+                              <span className="min-w-0">
+                                <span className="flex items-center gap-1.5">
+                                  <opt.icon className="h-4 w-4 text-primary-500 shrink-0" />
+                                  {opt.label}
+                                </span>
+                                <span className="block text-xs font-normal text-gray-500 mt-0.5">{opt.desc}</span>
+                              </span>
                             </button>
                           ))}
                         </div>

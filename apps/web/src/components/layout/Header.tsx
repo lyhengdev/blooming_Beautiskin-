@@ -21,6 +21,7 @@ const navItems = [
   { name: 'Sunscreen', href: '/shop?category=sunscreen' },
   { name: 'Mask', href: '/shop?category=mask' },
   { name: 'Brands', href: '/brands' },
+  { name: 'Track Order', href: '/track' },
 ];
 
 const ANNOUNCEMENT_KEY = 'bbs_announcement_dismissed';
