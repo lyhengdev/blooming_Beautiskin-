@@ -7,6 +7,7 @@ import { sendTelegramMessage, sendTelegramPhoto } from '../lib/telegram';
 import { renderInvoice } from '../lib/invoiceImage';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
+import { withoutOrderCosts } from '../lib/profit';
 
 interface AdminOrderItemInput {
   productId: string;
@@ -27,6 +28,7 @@ export async function createOrder(req: AuthRequest, res: Response) {
     shippingProvince,
     shippingNotes,
     paymentMethod = 'CASH_ON_DELIVERY',
+    couponCode,
   } = req.body;
 
   if (!userId && !sessionId) {
@@ -113,6 +115,23 @@ export async function createOrder(req: AuthRequest, res: Response) {
       }
     }
 
+    // Apply coupon (server-verified, atomic with the sale)
+    let discount = 0;
+    if (couponCode) {
+      const coupon = await tx.coupon.findUnique({ where: { code: couponCode } });
+      if (!coupon) throw new AppError('Invalid coupon code', 400);
+      if (!coupon.isActive) throw new AppError('This coupon is no longer active', 400);
+      if (coupon.expiresAt && coupon.expiresAt < new Date()) throw new AppError('This coupon has expired', 400);
+      if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) throw new AppError('This coupon has reached its usage limit', 400);
+      if (coupon.minOrder && subtotal < Number(coupon.minOrder)) {
+        throw new AppError(`Minimum order for this coupon is $${Number(coupon.minOrder).toFixed(2)}`, 400);
+      }
+      discount = coupon.type === 'PERCENTAGE' ? (subtotal * Number(coupon.value)) / 100 : Number(coupon.value);
+      discount = Math.min(discount, subtotal);
+      discount = Math.round(discount * 100) / 100;
+      await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
+    }
+
     // Create order
     const newOrder = await tx.order.create({
       data: {
@@ -120,7 +139,8 @@ export async function createOrder(req: AuthRequest, res: Response) {
         orderNumber: generateOrderNumber(),
         subtotal,
         shippingCost,
-        total,
+        discount,
+        total: subtotal + shippingCost - discount,
         shippingName,
         shippingPhone,
         shippingAddress,
@@ -133,6 +153,8 @@ export async function createOrder(req: AuthRequest, res: Response) {
             variantId: item.variantId,
             quantity: item.quantity,
             price: item.variant ? item.variant.price : item.product.price,
+            costPrice: item.product.costPrice,
+            costRecorded: true,
           })),
         },
         payment: {
@@ -165,6 +187,8 @@ export async function createOrder(req: AuthRequest, res: Response) {
     const invoiceData = {
       orderNumber: order.orderNumber,
       total: Number(order.total),
+      shippingCost: Number(order.shippingCost),
+      discount: Number(order.discount),
       shippingName: order.shippingName,
       shippingPhone: order.shippingPhone,
       shippingAddress: order.shippingAddress,
@@ -195,7 +219,7 @@ export async function createOrder(req: AuthRequest, res: Response) {
     );
   }
 
-  res.status(201).json({ status: 'success', data: { order } });
+  res.status(201).json({ status: 'success', data: { order: withoutOrderCosts(order) } });
 }
 
 export async function getUserOrders(req: AuthRequest, res: Response) {
@@ -226,7 +250,7 @@ export async function getUserOrders(req: AuthRequest, res: Response) {
   res.json({
     status: 'success',
     data: {
-      orders,
+      orders: orders.map(withoutOrderCosts),
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -258,7 +282,7 @@ export async function getOrder(req: AuthRequest, res: Response) {
     throw new AppError('Order not found', 404);
   }
 
-  res.json({ status: 'success', data: { order } });
+  res.json({ status: 'success', data: { order: withoutOrderCosts(order) } });
 }
 
 // ── Guest order tracking ───────────────────────────────────────────────────────
@@ -283,7 +307,7 @@ export async function trackOrder(req: AuthRequest, res: Response) {
     throw new AppError('Order not found. Check your order number and phone.', 404);
   }
 
-  res.json({ status: 'success', data: { order } });
+  res.json({ status: 'success', data: { order: withoutOrderCosts(order) } });
 }
 
 // ── Admin endpoints ───────────────────────────────────────────────────────────
@@ -453,8 +477,10 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
     shippingNotes,
     paymentMethod = 'CASH_ON_DELIVERY',
     deliveryFee,
+    discount: manualDiscount = 0,
     userId,
     items,
+    couponCode,
   } = req.body;
 
   // Resolve owner: use provided customer userId, else fall back to admin's own account
@@ -532,8 +558,28 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
     subtotal += Math.round(price * 100) * item.quantity / 100;
   }
 
+  // Manual discounts apply to products; delivery is charged separately.
+  let discount = Math.round(Number(manualDiscount) * 100) / 100;
+  if (!Number.isFinite(discount) || discount < 0 || discount > Math.round(subtotal * 100) / 100) {
+    throw new AppError('Discount must be between $0 and the product subtotal', 400);
+  }
+  if (couponCode && discount > 0) {
+    throw new AppError('Use either a manual discount or a coupon, not both', 400);
+  }
+  // Apply coupon (server-verified, atomic with stock + sale)
+  if (couponCode) {
+    const coupon = await tx.coupon.findUnique({ where: { code: couponCode } });
+    if (!coupon || !coupon.isActive) throw new AppError('Invalid coupon code', 400);
+    if (coupon.expiresAt && coupon.expiresAt < new Date()) throw new AppError('Coupon expired', 400);
+    if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) throw new AppError('Coupon usage limit reached', 400);
+    if (coupon.minOrder && subtotal < Number(coupon.minOrder)) throw new AppError(`Minimum order for this coupon is $${Number(coupon.minOrder).toFixed(2)}`, 400);
+    discount = coupon.type === 'PERCENTAGE' ? (subtotal * Number(coupon.value)) / 100 : Number(coupon.value);
+    discount = Math.min(Math.round(discount * 100) / 100, subtotal);
+    await tx.coupon.update({ where: { id: coupon.id }, data: { usedCount: { increment: 1 } } });
+  }
+
   const shippingCost = deliveryFee != null ? Number(deliveryFee) : 1.5;
-  const total = Math.round((subtotal + shippingCost) * 100) / 100;
+  const total = Math.round((subtotal + shippingCost - discount) * 100) / 100;
 
   if (!Number.isFinite(total) || total > 99999999.99) throw new AppError('Order total exceeds the supported amount', 400);
     // Decrement stock
@@ -569,6 +615,7 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
         subtotal,
         shippingCost,
         total,
+        discount,
         shippingName,
         shippingPhone,
         shippingAddress,
@@ -582,6 +629,8 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
             variantId: it.variantId || null,
             quantity: it.quantity,
             price: it.price.toString(),
+            costPrice: productMap.get(it.productId)!.costPrice,
+            costRecorded: true,
           })),
         },
         payment: {
@@ -617,6 +666,8 @@ export async function createOrderAdmin(req: AuthRequest, res: Response) {
     const invoiceData = {
       orderNumber: order.orderNumber,
       total: Number(order.total),
+      shippingCost: Number(order.shippingCost),
+      discount: Number(order.discount),
       shippingName: order.shippingName,
       shippingPhone: order.shippingPhone,
       shippingAddress: order.shippingAddress,

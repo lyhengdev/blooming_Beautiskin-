@@ -164,6 +164,27 @@ test('invalid quantities and stale prices cannot finalize a sale', async () => {
   assert.equal((await prisma.product.findUniqueOrThrow({ where: { id: item.id } })).stock, 20);
 });
 
+test('valid coupon discounts the order and increments usage atomically', async () => {
+  const item = await product();
+  const code = `BBS-COUPON-${randomUUID()}`;
+  const coupon = await prisma.coupon.create({ data: { code, type: 'FIXED_AMOUNT', value: 5, minOrder: 10, maxUses: 10, isActive: true } });
+  const response = await request('/orders/admin/create', 'POST', { ...sale(item.id), couponCode: code });
+  assert.equal(response.status, 201, JSON.stringify(response.body));
+  const { order } = response.body.data;
+  assert.equal(Number(order.discount), 5);
+  assert.equal(Number(order.total), Number(order.subtotal) + Number(order.shippingCost) - Number(order.discount));
+  assert.equal((await prisma.coupon.findUniqueOrThrow({ where: { id: coupon.id } })).usedCount, 1);
+});
+
+test('invalid or expired coupons are rejected and usage is untouched', async () => {
+  const item = await product();
+  const code = `BBS-COUPON-${randomUUID()}`;
+  const coupon = await prisma.coupon.create({ data: { code, type: 'FIXED_AMOUNT', value: 5, minOrder: 10, maxUses: 10, isActive: true, expiresAt: new Date(Date.now() - 60_000) } });
+  assert.equal((await request('/orders/admin/create', 'POST', { ...sale(item.id), couponCode: code })).status, 400);
+  assert.equal((await request('/orders/admin/create', 'POST', { ...sale(item.id), couponCode: 'DOES-NOT-EXIST' })).status, 400);
+  assert.equal((await prisma.coupon.findUniqueOrThrow({ where: { id: coupon.id } })).usedCount, 0);
+});
+
 test('internal barcode generation is stable across concurrent retries', async () => {
   const item = await product();
   const responses = await Promise.all([request(`/products/admin/${item.id}/barcodes/generate`, 'POST', {}), request(`/products/admin/${item.id}/barcodes/generate`, 'POST', {})]);

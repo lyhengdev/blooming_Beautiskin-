@@ -27,6 +27,8 @@ export type InvoiceItem = { name: string; quantity: number; price: number };
 export type InvoiceData = {
   orderNumber: string;
   total: number;
+  shippingCost?: number;
+  discount?: number;
   shippingName: string;
   shippingPhone: string;
   shippingAddress: string;
@@ -142,7 +144,8 @@ function buildHtml(
     (a, it) => a + Number(it.price) * it.quantity,
     0,
   );
-  const delivery = Number((data.total - subtotal).toFixed(2));
+  const discount = data.discount ?? 0;
+  const delivery = data.shippingCost ?? Number((data.total - subtotal + discount).toFixed(2));
 
   const itemsHtml = data.items
     .map(
@@ -230,6 +233,7 @@ function buildHtml(
     <hr class="dash"/>
     <div class="summary"><span class="k">Subtotal</span><span>${fmt(subtotal)}</span></div>
     <div class="summary"><span class="k">Delivery</span><span>${fmt(delivery)}</span></div>
+    ${discount > 0 ? `<div class="summary"><span class="k">Discount</span><span>-${fmt(discount)}</span></div>` : ''}
     <hr class="solid"/>
     <div class="total-row"><span>TOTAL</span><span>${fmt(data.total)}</span></div>
     <hr class="dash"/>

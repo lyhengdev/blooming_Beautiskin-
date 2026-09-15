@@ -74,6 +74,7 @@ export default function OnlineSellingPage() {
   const [province, setProvince] = useState('');
   const [notes, setNotes] = useState('');
   const [deliveryFee, setDeliveryFee] = useState('1.50');
+  const [discountAmount, setDiscountAmount] = useState('0');
   const [paymentMethod, setPaymentMethod] = useState('WING');
 
   // Confirmation modal
@@ -96,7 +97,14 @@ export default function OnlineSellingPage() {
     [cart],
   );
   const delivery = parseFloat(deliveryFee) || 0;
-  const total = subtotal + delivery;
+  const discount = Number(discountAmount || 0);
+  const discountError = !Number.isFinite(discount) || discount < 0
+    ? 'Enter a discount of $0 or more.'
+    : Math.abs(discount * 100 - Math.round(discount * 100)) >= 0.000001
+      ? 'Use at most two decimal places.'
+      : discount > subtotal ? `Discount cannot exceed the subtotal ($${subtotal.toFixed(2)}).` : '';
+  const total = Math.round((subtotal + delivery - (discountError ? 0 : discount)) * 100) / 100;
+  const totalLabel = discountError ? '—' : `$${total.toFixed(2)}`;
 
   // ── Cart helpers ──────────────────────────────────────────────────────────
 
@@ -229,6 +237,7 @@ export default function OnlineSellingPage() {
         shippingNotes: notes || undefined,
         paymentMethod,
         deliveryFee: delivery,
+        discount,
         ...(selectedUserId ? { userId: selectedUserId } : {}),
         items: cart.map((l) => ({
           productId: l.product.id,
@@ -245,6 +254,8 @@ export default function OnlineSellingPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminOrders'] });
       queryClient.invalidateQueries({ queryKey: ['adminOrderStats'] });
+      queryClient.invalidateQueries({ queryKey: ['adminDashboardStats'] });
+      queryClient.invalidateQueries({ queryKey: ['adminProfitStats'] });
       queryClient.invalidateQueries({ queryKey: ['onlineSellingProducts'] });
       queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
       checkoutRequest.current = null;
@@ -254,7 +265,7 @@ export default function OnlineSellingPage() {
       setShowConfirm(false);
       setCart([]);
       setName(''); setPhone(''); setAddress(''); setCity('');
-      setProvince(''); setNotes(''); setDeliveryFee('1.50');
+      setProvince(''); setNotes(''); setDeliveryFee('1.50'); setDiscountAmount('0');
       setSelectedUserId('');
       setRegisterOpen(false);
       setRegisterName('');
@@ -270,7 +281,7 @@ export default function OnlineSellingPage() {
   });
 
   const canSubmit =
-    !scanPending && cart.length > 0 && name.trim() && phone.trim() && address.trim() && city.trim() && province;
+    !discountError && !scanPending && cart.length > 0 && name.trim() && phone.trim() && address.trim() && city.trim() && province;
 
   return (
     <div className="pb-24 lg:pb-0">
@@ -448,19 +459,39 @@ export default function OnlineSellingPage() {
                 <span className="font-bold">${subtotal.toFixed(2)}</span>
               </div>
               <div className="flex items-center justify-between text-xs text-gray-600">
-                <span>Delivery ($)</span>
+                <label htmlFor="sale-delivery">Delivery ($)</label>
                 <input
                   type="number"
                   step="0.01"
                   min="0"
+                  id="sale-delivery"
                   value={deliveryFee}
                   onChange={(e) => setDeliveryFee(e.target.value)}
                   className="input-field w-20 text-xs py-1 text-right"
                 />
               </div>
+              <div className="flex items-center justify-between text-xs text-gray-600">
+                <label htmlFor="sale-discount">Discount ($)</label>
+                <input
+                  id="sale-discount"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.01"
+                  min="0"
+                  max={subtotal}
+                  value={discountAmount}
+                  onChange={(e) => setDiscountAmount(e.target.value)}
+                  onBlur={() => { if (!discountAmount) setDiscountAmount('0'); }}
+                  disabled={showConfirm || createMutation.isPending}
+                  aria-invalid={!!discountError}
+                  aria-describedby={discountError ? 'sale-discount-error' : undefined}
+                  className="input-field w-20 text-xs py-1 text-right"
+                />
+              </div>
+              {discountError && <p id="sale-discount-error" role="alert" className="text-xs text-red-600">{discountError}</p>}
               <div className="flex justify-between text-sm font-extrabold text-gray-900 pt-1 border-t border-blush-100">
                 <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>{totalLabel}</span>
               </div>
             </div>
           </div>
@@ -660,7 +691,7 @@ export default function OnlineSellingPage() {
         </div>
       </div>}
       {cart.length > 0 && <div className="fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t bg-white px-5 py-3 pb-[max(12px,env(safe-area-inset-bottom))] lg:hidden">
-        <div className="text-sm"><span className="font-bold">${total.toFixed(2)}</span><span className="ml-2 text-gray-500">{cart.reduce((sum, line) => sum + line.qty, 0)} items</span></div>
+        <div className="text-sm"><span className="font-bold">{totalLabel}</span><span className="ml-2 text-gray-500">{cart.reduce((sum, line) => sum + line.qty, 0)} items</span></div>
         <button type="button" onClick={() => cartPanel.current?.scrollIntoView({ behavior: 'smooth' })} className="flex items-center gap-2 rounded-lg bg-gray-900 px-3 py-2 text-sm text-white"><ShoppingCart className="h-4 w-4" />Review sale</button>
       </div>}
       {showConfirm && (
@@ -698,9 +729,13 @@ export default function OnlineSellingPage() {
                   <span className="text-gray-600">Delivery</span>
                   <span className="font-bold">${delivery.toFixed(2)}</span>
                 </div>
+                <div className="flex justify-between text-sm text-emerald-700">
+                  <span>Discount</span>
+                  <span className="font-bold">−${discount.toFixed(2)}</span>
+                </div>
                 <div className="flex justify-between text-base font-extrabold text-gray-900 pt-1 border-t border-blush-100">
                   <span>Total</span>
-                  <span>${total.toFixed(2)}</span>
+                  <span>{totalLabel}</span>
                 </div>
               </div>
 

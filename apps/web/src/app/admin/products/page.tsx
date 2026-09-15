@@ -167,6 +167,7 @@ function ProductFormModal({
         : api.post('/products/admin', payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminProducts'] });
+      queryClient.invalidateQueries({ queryKey: ['adminProfitStats'] });
       toast.success(initial ? 'Product updated' : 'Product created');
       onSaved();
     },

@@ -528,7 +528,7 @@ export async function createProduct(req: AuthRequest, res: Response) {
       usage: usage?.trim() || null,
       price: parseFloat(price),
       comparePrice: comparePrice ? parseFloat(comparePrice) : null,
-      costPrice: costPrice ? parseFloat(costPrice) : null,
+      costPrice: costPrice != null && costPrice !== '' ? parseFloat(costPrice) : null,
       sku: sku.trim(),
       barcodes: { create: barcodeAssignments(req.body.barcodes ?? []) },
       stock: parseInt(stock as string) || 0,
@@ -626,7 +626,7 @@ export async function updateProduct(req: AuthRequest, res: Response) {
   if (usage !== undefined) data.usage = usage?.trim() || null;
   if (price !== undefined) data.price = parseFloat(price);
   if (comparePrice !== undefined) data.comparePrice = comparePrice ? parseFloat(comparePrice) : null;
-  if (costPrice !== undefined) data.costPrice = costPrice ? parseFloat(costPrice) : null;
+  if (costPrice !== undefined) data.costPrice = costPrice !== null && costPrice !== '' ? parseFloat(costPrice) : null;
   if (sku !== undefined) data.sku = sku.trim();
   if (stock !== undefined) data.stock = parseInt(stock as string);
   if (trackStock !== undefined) data.trackStock = trackStock;

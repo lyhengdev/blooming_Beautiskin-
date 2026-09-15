@@ -15,7 +15,9 @@
     "db:import:products": "tsx src/prisma/import-products.ts",
     "db:reset": "prisma migrate reset",
     "db:studio": "prisma studio",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "test:profit": "tsx --test tests/profit.test.ts",
+    "db:backfill-costs": "tsx src/prisma/backfill-costs.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.14.0",

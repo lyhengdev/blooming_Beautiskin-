@@ -17,6 +17,9 @@ router.post('/admin/create', [
   body('userId').optional().isString().notEmpty(),
   body('paymentMethod').optional().isIn(['ABA_PAY', 'WING', 'CREDIT_CARD', 'CASH_ON_DELIVERY']),
   body('deliveryFee').optional().isFloat({ min: 0, max: 999999 }).toFloat(),
+  body('discount').optional().isFloat({ min: 0, max: 99999999.99 })
+    .custom((value) => Math.abs(Number(value) * 100 - Math.round(Number(value) * 100)) < 0.000001)
+    .withMessage('Discount must be a non-negative amount with at most two decimal places').toFloat(),
   body('items').isArray({ min: 1, max: 200 }),
   body('items.*.productId').isString().notEmpty(),
   body('items.*.variantId').optional().isString().notEmpty(),

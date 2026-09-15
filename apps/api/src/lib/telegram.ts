@@ -155,6 +155,8 @@ const LINE = '━━━━━━━━━━━━━━━━━━━━━━
 type OrderWithItems = {
   orderNumber: string;
   total: number;
+  shippingCost: Prisma.Decimal | number | string;
+  discount: Prisma.Decimal | number | string;
   shippingName: string;
   shippingPhone: string;
   shippingAddress: string;
@@ -228,7 +230,9 @@ export function formatInvoice(order: OrderWithItems, showDetails: boolean = true
     lines.push(LINE);
   }
 
-  lines.push(`<b>TOTAL: $${order.total.toFixed(2)}</b>`);
+  lines.push(`Delivery: $${Number(order.shippingCost).toFixed(2)}`);
+  if (Number(order.discount) > 0) lines.push(`Discount: -$${Number(order.discount).toFixed(2)}`);
+  lines.push(`<b>TOTAL: $${Number(order.total).toFixed(2)}</b>`);
   lines.push(LINE);
   lines.push(``);
   lines.push(`Payment: ${paymentLabels[order.paymentMethod] || order.paymentMethod}`);
@@ -254,6 +258,8 @@ export async function sendInvoice(
     const invoiceData = {
       orderNumber: order.orderNumber,
       total: Number(order.total),
+      shippingCost: Number(order.shippingCost),
+      discount: Number(order.discount),
       shippingName: order.shippingName,
       shippingPhone: order.shippingPhone,
       shippingAddress: order.shippingAddress,

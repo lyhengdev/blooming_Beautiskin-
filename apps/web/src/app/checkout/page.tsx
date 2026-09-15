@@ -12,11 +12,34 @@ import { useCartStore } from '@/stores/cartStore';
 import { useAuthStore } from '@/stores/authStore';
 import { getDeliveryFee } from '@/lib/delivery';
 import api from '@/lib/api';
-
 const PROVINCES = [
-  'Phnom Penh', 'Battambang', 'Siem Reap', 'Sihanoukville', 'Kampot',
-  'Kandal', 'Prey Veng', 'Kampong Cham', 'Kampong Speu', 'Koh Kong',
+  'Banteay Meanchey',
+  'Battambang',
+  'Kampong Cham',
+  'Kampong Chhnang',
+  'Kampong Speu',
+  'Kampong Thom',
+  'Kampot',
+  'Kandal',
+  'Kep',
+  'Koh Kong',
+  'Kratie',
+  'Mondulkiri',
+  'Oddar Meanchey',
+  'Pailin',
+  'Phnom Penh',
+  'Preah Vihear',
+  'Prey Veng',
+  'Pursat',
+  'Ratanakiri',
+  'Siem Reap',
+  'Sihanoukville',
+  'Stung Treng',
+  'Svay Rieng',
+  'Takeo',
+  'Tboung Khmum'
 ];
+
 
 export default function CheckoutPage() {
   const router = useRouter();
