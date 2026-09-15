@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, AlertTriangle, PiggyBank, RefreshCw } from 'lucide-react';
+import { ArrowRight, AlertTriangle, PiggyBank, RefreshCw, Calendar } from 'lucide-react';
 import api from '@/lib/api';
 
 type Summary = {
@@ -13,23 +13,38 @@ type Summary = {
   estimatedCostProducts?: { productId: string; name: string; sku: string; estimatedUnits: number; costPrice: number }[];
 };
 type ProfitStats = {
-  today: Summary; last30Days: Summary; allTime: Summary;
+  today: Summary; last30Days: Summary; allTime: Summary; custom?: Summary;
   trend: (Summary & { date: string })[];
   topProducts: (Summary & { productId: string; name: string; sku: string })[];
   totalProducts: number; totalProductsWithCost: number;
 };
 const money = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-const periods = [{ key: 'today', label: 'Today' }, { key: 'last30Days', label: 'Last 30 days' }, { key: 'allTime', label: 'All time' }] as const;
+const periods = [
+  { key: 'today', label: 'Today' },
+  { key: 'last30Days', label: 'Last 30 days' },
+  { key: 'allTime', label: 'All time' },
+  { key: 'custom', label: 'Custom' },
+] as const;
+type PeriodKey = typeof periods[number]['key'];
 
 export default function ProfitOverview() {
-  const [period, setPeriod] = useState<typeof periods[number]['key']>('last30Days');
+  const [period, setPeriod] = useState<PeriodKey>('last30Days');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const isCustom = period === 'custom' && customFrom && customTo;
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
-    queryKey: ['adminProfitStats'],
-    queryFn: async () => (await api.get<{ data: ProfitStats }>('/admin/profit-stats')).data.data,
+    queryKey: ['adminProfitStats', isCustom ? customFrom : null, isCustom ? customTo : null],
+    queryFn: async () => {
+      const params = isCustom ? { params: { from: customFrom, to: customTo } } : {};
+      return (await api.get<{ data: ProfitStats }>('/admin/profit-stats', params)).data.data;
+    },
     refetchInterval: 60000,
   });
-  const summary = data?.[period];
+  const summary = period === 'custom' ? data?.custom : data?.[period];
   const max = Math.max(...(data?.trend.map((day) => Math.abs(day.profit ?? 0)) ?? []), 1);
+  const periodLabel = period === 'custom' && customFrom && customTo
+    ? `${customFrom} – ${customTo}`
+    : periods.find((entry) => entry.key === period)?.label;
 
   return (
     <section aria-labelledby="profit-heading" className="mb-6 overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-pink-sm">
@@ -45,8 +60,18 @@ export default function ProfitOverview() {
           <button onClick={() => refetch()} disabled={isFetching} aria-label="Refresh profit" className="rounded-lg p-2 text-gray-500 hover:bg-white disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} /></button>
         </div>
       </div>
+      {period === 'custom' && <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 bg-gray-50/50 px-5 py-3">
+        <Calendar className="h-4 w-4 text-gray-400" />
+        <label className="text-xs font-semibold text-gray-600">From
+          <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="ml-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+        </label>
+        <label className="text-xs font-semibold text-gray-600">To
+          <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="ml-2 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-700 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
+        </label>
+        {!customFrom || !customTo ? <p className="text-xs text-gray-400">Select both dates to see results</p> : null}
+      </div>}
       {isLoading ? <p role="status" className="p-8 text-center text-sm text-gray-500">Loading profit…</p>
-        : isError ? <div role="alert" className="p-6 text-sm text-red-600">Couldn’t load profit. <button onClick={() => refetch()} className="font-bold underline">Try again</button></div>
+        : isError ? <div role="alert" className="p-6 text-sm text-red-600">Couldn&apos;t load profit. <button onClick={() => refetch()} className="font-bold underline">Try again</button></div>
         : summary && data && <div className="p-5">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className={`rounded-xl p-4 ${summary.profit !== null && summary.profit < 0 ? 'bg-red-50' : 'bg-emerald-50'}`}>
@@ -63,7 +88,7 @@ export default function ProfitOverview() {
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
               <p>{summary.unitsWithoutCost} sold {summary.unitsWithoutCost === 1 ? 'unit has' : 'units have'} no recorded cost, so profit and margin are incomplete.</p>
             </div>
-            <h3 className="mt-3 font-bold">Products missing cost · {periods.find((entry) => entry.key === period)?.label}</h3>
+            <h3 className="mt-3 font-bold">Products missing cost · {periodLabel}</h3>
             <ul aria-label="Products missing cost" className="mt-2 max-h-64 space-y-2 overflow-y-auto">
               {(summary.missingCostProducts ?? []).map((product) => <li key={product.productId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 px-3 py-2">
                 <div className="min-w-0 flex-1 basis-40">
@@ -74,14 +99,14 @@ export default function ProfitOverview() {
                 <Link href={`/admin/products?edit=${encodeURIComponent(product.productId)}`} aria-label={`Edit cost for ${product.name}`} className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-amber-200 px-3 py-1.5 font-bold hover:bg-amber-100">Edit cost <ArrowRight className="h-3 w-3" /></Link>
               </li>)}
             </ul>
-            <p className="mt-3">Set each product’s purchase cost before new sales. Older sales without a saved cost use the current product cost as an estimate.</p>
+            <p className="mt-3">Set each product&apos;s purchase cost before new sales. Older sales without a saved cost use the current product cost as an estimate.</p>
           </div>}
           {summary.estimatedUnits > 0 && <details key={period} className="mt-3 rounded-xl border border-amber-100 bg-amber-50/50 p-4 text-xs leading-5 text-amber-800">
             <summary className="cursor-pointer rounded font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-600">
               {summary.estimatedUnits} {summary.estimatedUnits === 1 ? 'unit from an older sale uses' : 'units from older sales use'} current product costs. Their profit is an estimate.
               <span className="ml-2 underline">View products ({summary.estimatedCostProducts?.length ?? 0})</span>
             </summary>
-            <h3 className="mt-3 font-bold">Products using estimated costs · {periods.find((entry) => entry.key === period)?.label}</h3>
+            <h3 className="mt-3 font-bold">Products using estimated costs · {periodLabel}</h3>
             <ul aria-label="Products using estimated costs" className="mt-2 max-h-64 space-y-2 overflow-y-auto">
               {(summary.estimatedCostProducts ?? []).map((product) => <li key={product.productId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white/80 px-3 py-2">
                 <div className="min-w-0 flex-1 basis-40">

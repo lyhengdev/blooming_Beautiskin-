@@ -263,7 +263,11 @@ export async function getDashboardStats(_req: Request, res: Response) {
  * GET /api/admin/profit-stats
  * Profit, margin, and cost analytics for the admin dashboard.
  */
-export async function getProfitStats(_req: Request, res: Response) {
+export async function getProfitStats(req: Request, res: Response) {
+  const fromParam = req.query.from as string | undefined;
+  const toParam = req.query.to as string | undefined;
+  const from = fromParam ? new Date(fromParam) : undefined;
+  const to = toParam ? new Date(toParam) : undefined;
   const [orders, totalProducts, totalProductsWithCost] = await Promise.all([
     prisma.order.findMany({
       where: { status: { notIn: ['CANCELLED', 'REFUNDED'] } },
@@ -280,7 +284,7 @@ export async function getProfitStats(_req: Request, res: Response) {
   ]);
   res.setHeader('Cache-Control', 'no-store');
   res.json({ status: 'success', data: {
-    ...calculateProfitStats(orders), totalProducts, totalProductsWithCost,
+    ...calculateProfitStats(orders, new Date(), { from, to }), totalProducts, totalProductsWithCost,
   } });
 }
 

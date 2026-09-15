@@ -92,3 +92,20 @@ test('estimated-cost product lists reconcile by period and exclude saved or unkn
   }
   assert.deepEqual(calculateProfitStats([], now).allTime.estimatedCostProducts, []);
 });
+
+test('custom date range buckets orders inclusively and is omitted without dates', () => {
+  const inRange = order({ createdAt: new Date('2026-09-10T02:00:00Z') });
+  const boundaryStart = order({ createdAt: new Date('2026-09-01T00:00:00Z') });
+  const boundaryEnd = order({ createdAt: new Date('2026-09-15T04:59:59Z') });
+  const outside = order({ createdAt: new Date('2026-08-31T23:59:59Z') });
+  const stats = calculateProfitStats([
+    inRange, inRange, boundaryStart, boundaryEnd, outside,
+    order({ createdAt: new Date('2026-09-14T20:00:00Z'), status: 'CANCELLED' }),
+  ], now, { from: new Date('2026-09-01'), to: new Date('2026-09-15') });
+  assert.equal(stats.custom!.orders, 4);
+  assert.equal(stats.custom!.revenue, 68);
+  assert.equal(stats.custom!.profit, 36);
+  assert.equal(stats.custom!.unitsSold, 8);
+  assert.equal(stats.custom!.missingCostProducts.length, 0);
+  assert.deepEqual(calculateProfitStats([inRange], now).custom, undefined);
+});
